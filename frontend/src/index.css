@@ -12,3 +12,17 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
+
+@keyframes dance {
+  0%, 100% { transform: rotate(-8deg) translateY(0px);   }
+  20%       { transform: rotate( 8deg) translateY(-3px);  }
+  40%       { transform: rotate(-5deg) translateY(0px);   }
+  60%       { transform: rotate( 6deg) translateY(-2px);  }
+  80%       { transform: rotate(-4deg) translateY(0px);   }
+}
+
+.animate-dance {
+  animation: dance 3.6s ease-in-out infinite;
+  display: inline-block;
+  transform-origin: bottom center;
+}
