@@ -10,9 +10,9 @@
     "dist/"
   ],
   "scripts": {
-    "build": "npm run build -w scimmy-frontend && npm run build -w scimmy-cli && npm run build -w scimmy-backend",
+    "build": "npm run build -w scimit-frontend && npm run build -w scimit-cli && npm run build -w scimit-backend",
     "start": "node dist/cli.js",
-    "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm run dev -w scimmy-backend\" \"npm run dev -w scimmy-frontend\"",
+    "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm run dev -w scimit-backend\" \"npm run dev -w scimit-frontend\"",
     "prepublishOnly": "npm run build"
   },
   "workspaces": [

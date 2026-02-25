@@ -1,7 +1,7 @@
 {
-  "name": "scimmy-backend",
+  "name": "scimit-backend",
   "version": "1.0.0",
-  "description": "SCIM Watch Service Backend",
+  "description": "SCIMit backend server",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {

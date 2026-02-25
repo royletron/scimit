@@ -1,7 +1,7 @@
 {
-  "name": "scimmy-cli",
+  "name": "scimit-cli",
   "version": "1.0.0",
-  "description": "CLI entry point for SCIMmy",
+  "description": "SCIMit CLI entry point",
   "type": "module",
   "scripts": {
     "build": "tsc"
