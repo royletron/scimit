@@ -34,7 +34,7 @@ export function Header() {
         <div className="flex items-center justify-between h-14">
           <div className="flex items-center gap-2">
             <span className="text-2xl leading-none animate-dance">🕺</span>
-            <span className="text-base font-semibold text-slate-900">SCIMmy</span>
+            <span className="text-base font-semibold text-slate-900">SCIMit</span>
           </div>
           <button
             onClick={handleReset}

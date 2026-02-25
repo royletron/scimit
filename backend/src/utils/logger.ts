@@ -44,7 +44,7 @@ export function logRequest(method: string, urlPath: string, status: number, ms: 
 export function logStartup(port: number, dbPath: string): void {
   const base = `http://localhost:${port}`;
   process.stdout.write('\n');
-  process.stdout.write(`  ${chalk.bold.hex('#818cf8')('🕺 SCIMmy')}  ${chalk.dim('ready')}\n`);
+  process.stdout.write(`  ${chalk.bold.hex('#818cf8')('🕺 SCIMit')}  ${chalk.dim('ready')}\n`);
   process.stdout.write('\n');
   process.stdout.write(`  ${chalk.dim('Dashboard')}  →  ${chalk.cyan.underline(base)}\n`);
   process.stdout.write(`  ${chalk.dim('SCIM')}       →  ${chalk.cyan.underline(`${base}/scim/v2`)}\n`);
@@ -122,7 +122,12 @@ function startWaiting(): void {
     promptIdx = (promptIdx + 1) % PROMPTS.length;
   }, 60_000);
 
-  const cleanup = () => { clearWaiting(); process.exit(0); };
+  const cleanup = () => {
+    clearInterval(spinnerTimer!);
+    clearInterval(promptTimer!);
+    clearWaiting();
+    process.exit(0);
+  };
   process.once('SIGINT',  cleanup);
   process.once('SIGTERM', cleanup);
 }

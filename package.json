@@ -1,10 +1,10 @@
 {
-  "name": "scimmy",
+  "name": "scimit",
   "version": "1.0.0",
   "description": "A local SCIM 2.0 sink — capture, inspect, and debug IDP provisioning requests",
   "type": "module",
   "bin": {
-    "scimmy": "./dist/cli.js"
+    "scimit": "./dist/cli.js"
   },
   "files": [
     "dist/"

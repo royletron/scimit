@@ -1,8 +1,8 @@
-# 🕺 SCIMmy
+# 🕺 SCIMit
 
 **Finally understand what your Identity Provider is actually doing.**
 
-SCIMmy is a local SCIM 2.0 sink that captures, stores, and beautifully displays every provisioning request your IDP fires at you. Point Okta, Entra ID, or any SCIM-compatible IdP at it and watch users, groups, and requests stream in live — with full syntax-highlighted JSON, request/response inspection, and zero infrastructure faff.
+SCIMit is a local SCIM 2.0 sink that captures, stores, and beautifully displays every provisioning request your IDP fires at you. Point Okta, Entra ID, or any SCIM-compatible IdP at it and watch users, groups, and requests stream in live — with full syntax-highlighted JSON, request/response inspection, and zero infrastructure faff.
 
 > Perfect for debugging SCIM integrations, understanding IDP behaviour, and not losing your mind during provisioning setup.
 
@@ -24,7 +24,7 @@ SCIMmy is a local SCIM 2.0 sink that captures, stores, and beautifully displays 
 ### Run with npx (no install)
 
 ```bash
-npx scimmy
+npx scimit
 ```
 
 Opens everything on **http://localhost:3088** — dashboard, SCIM endpoint, and API all through one port.
@@ -32,18 +32,18 @@ Opens everything on **http://localhost:3088** — dashboard, SCIM endpoint, and 
 ```
 Options:
   --port, -p  Port to listen on       [default: 3088]
-  --db,   -d  Path to SQLite database [default: ~/.scimmy/data.db]
+  --db,   -d  Path to SQLite database [default: ~/.scimit/data.db]
 ```
 
 ```bash
-npx scimmy --port 8080 --db /data/scimmy.db
+npx scimit --port 8080 --db /data/scimit.db
 ```
 
 ### Install globally
 
 ```bash
-npm install -g scimmy
-scimmy
+npm install -g scimit
+scimit
 ```
 
 ### Development (from source)
@@ -72,7 +72,7 @@ Quick IDP guides:
 - **Okta**: Applications → [Your App] → Provisioning → Integration → Configure API Integration
 - **Entra ID**: Enterprise Applications → [Your App] → Provisioning → Tenant URL + Secret Token
 
-> If your IDP is cloud-hosted and can't reach localhost, expose SCIMmy with [localhost.run](https://localhost.run) (`ssh -R 80:localhost:3088 nokey@localhost.run`) or [localtunnel](https://theboroer.github.io/localtunnel-www/) (`npx localtunnel --port 3088`) — both require no account or install.
+> If your IDP is cloud-hosted and can't reach localhost, expose SCIMit with [localhost.run](https://localhost.run) (`ssh -R 80:localhost:3088 nokey@localhost.run`) or [localtunnel](https://theboroer.github.io/localtunnel-www/) (`npx localtunnel --port 3088`) — both require no account or install.
 
 ---
 
@@ -107,7 +107,7 @@ curl -X POST \
 
 ## ⚠️ Heads up
 
-SCIMmy is a **dev/debug tool** — it's not hardened for production. The admin API is unauthenticated by design, so keep it off the public internet.
+SCIMit is a **dev/debug tool** — it's not hardened for production. The admin API is unauthenticated by design, so keep it off the public internet.
 
 ---
 
