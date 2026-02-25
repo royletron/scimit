@@ -14,15 +14,27 @@ code {
 }
 
 @keyframes dance {
-  0%, 100% { transform: rotate(-8deg) translateY(0px);   }
-  20%       { transform: rotate( 8deg) translateY(-3px);  }
-  40%       { transform: rotate(-5deg) translateY(0px);   }
-  60%       { transform: rotate( 6deg) translateY(-2px);  }
-  80%       { transform: rotate(-4deg) translateY(0px);   }
+  /* Wait */
+  0%, 28%  { transform: rotate( 0deg) scaleX( 1) translateY(0px);  }
+  /* Sway and bounce */
+  33%      { transform: rotate(-8deg) scaleX( 1) translateY(-3px); }
+  38%      { transform: rotate( 7deg) scaleX( 1) translateY(0px);  }
+  42%      { transform: rotate(-5deg) scaleX( 1) translateY(-2px); }
+  46%      { transform: rotate( 0deg) scaleX( 1) translateY(0px);  }
+  /* Spin — scaleX 1 → 0 → -1 → 0 → 1 = full 360 */
+  50%      { transform: rotate( 0deg) scaleX( 0) translateY(-2px); }
+  54%      { transform: rotate( 0deg) scaleX(-1) translateY(0px);  }
+  62%      { transform: rotate( 0deg) scaleX( 0) translateY(-2px); }
+  66%      { transform: rotate( 0deg) scaleX( 1) translateY(0px);  }
+  /* Settle sway */
+  71%      { transform: rotate( 5deg) scaleX( 1) translateY(-2px); }
+  75%      { transform: rotate(-3deg) scaleX( 1) translateY(0px);  }
+  /* Wait */
+  80%, 100% { transform: rotate( 0deg) scaleX( 1) translateY(0px); }
 }
 
 .animate-dance {
-  animation: dance 3.6s ease-in-out infinite;
+  animation: dance 5.5s ease-in-out infinite;
   display: inline-block;
   transform-origin: bottom center;
 }
