@@ -21,22 +21,44 @@ SCIMmy is a local SCIM 2.0 sink that captures, stores, and beautifully displays 
 
 ## 🚀 Getting started
 
-### Prerequisites
-Node.js 18+
+### Run with npx (no install)
 
-### Install & run
+```bash
+npx scimmy
+```
+
+Opens everything on **http://localhost:3088** — dashboard, SCIM endpoint, and API all through one port.
+
+```
+Options:
+  --port, -p  Port to listen on       [default: 3088]
+  --db,   -d  Path to SQLite database [default: ~/.scimmy/data.db]
+```
+
+```bash
+npx scimmy --port 8080 --db /data/scimmy.db
+```
+
+### Install globally
+
+```bash
+npm install -g scimmy
+scimmy
+```
+
+### Development (from source)
 
 ```bash
 npm install
-npm run dev
+npm run dev    # backend on :3000, frontend on :5173 (Vite proxy)
+npm run build  # compiles everything to dist/
 ```
-
-That's it. Both backend and frontend start together with coloured, labelled output.
 
 | Service  | URL |
 |----------|-----|
-| Frontend | http://localhost:5173 |
-| Backend  | http://localhost:3000 |
+| Dashboard (dev) | http://localhost:5173 |
+| Dashboard (built) | http://localhost:3088 |
+| Backend (dev, internal) | http://localhost:3000 |
 
 ---
 
@@ -44,13 +66,13 @@ That's it. Both backend and frontend start together with coloured, labelled outp
 
 Head to the **Connector** page in the UI — it has your SCIM base URL and bearer token ready to copy, plus step-by-step setup instructions.
 
-**SCIM base URL:** `http://your-host:3000/scim/v2`
+**SCIM base URL:** `http://your-host:3088/scim/v2`
 
 Quick IDP guides:
 - **Okta**: Applications → [Your App] → Provisioning → Integration → Configure API Integration
 - **Entra ID**: Enterprise Applications → [Your App] → Provisioning → Tenant URL + Secret Token
 
-> If your IDP is cloud-hosted and can't reach localhost, expose the backend with [localhost.run](https://localhost.run) (`ssh -R 80:localhost:3000 nokey@localhost.run`) or [localtunnel](https://theboroer.github.io/localtunnel-www/) (`npx localtunnel --port 3000`) — both require no account or install.
+> If your IDP is cloud-hosted and can't reach localhost, expose SCIMmy with [localhost.run](https://localhost.run) (`ssh -R 80:localhost:3088 nokey@localhost.run`) or [localtunnel](https://theboroer.github.io/localtunnel-www/) (`npx localtunnel --port 3088`) — both require no account or install.
 
 ---
 
@@ -61,14 +83,14 @@ Grab your token from the Connector page, then:
 ```bash
 # List users
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  http://localhost:3000/scim/v2/Users
+  http://localhost:3088/scim/v2/Users
 
 # Create a user
 curl -X POST \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/scim+json" \
   -d '{"userName":"test@example.com","active":true}' \
-  http://localhost:3000/scim/v2/Users
+  http://localhost:3088/scim/v2/Users
 ```
 
 ---

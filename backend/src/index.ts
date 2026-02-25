@@ -1,16 +1,18 @@
 import express from 'express';
 import cors from 'cors';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-import db, { initializeDatabase } from './config/database.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { initializeDatabase } from './config/database.js';
 import { authenticateToken } from './middleware/auth.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import scimRoutes from './routes/scim.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import logsRoutes from './routes/logs.routes.js';
+import { logRequest, logStartup } from './utils/logger.js';
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,10 +23,16 @@ initializeDatabase();
 // Middleware
 app.use(cors());
 app.use(express.json({ type: ['application/json', 'application/scim+json'] }));
-app.use(morgan('dev'));
+
+// Colored request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => logRequest(req.method, req.path, res.statusCode, Date.now() - start));
+  next();
+});
 
 // Health check endpoint (no auth required)
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -35,14 +43,19 @@ app.use('/api/logs', logsRoutes);
 // SCIM routes (require authentication) — only SCIM requests are logged
 app.use('/scim/v2', requestLogger, authenticateToken, scimRoutes);
 
+// Serve built frontend (production) — skipped transparently in dev
+const publicPath = path.join(__dirname, 'public');
+if (fs.existsSync(path.join(publicPath, 'index.html'))) {
+  app.use(express.static(publicPath));
+  app.get('/{*path}', (_req, res) => res.sendFile(path.join(publicPath, 'index.html')));
+}
+
 // Error handler
 app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`SCIM Watch Service running on http://localhost:${PORT}`);
-  console.log(`SCIM endpoint: http://localhost:${PORT}/scim/v2`);
-  console.log(`Admin API: http://localhost:${PORT}/api`);
+  logStartup(Number(PORT), process.env.DATABASE_PATH ?? path.join(__dirname, '../../scim-watch.db'));
 });
 
 export default app;

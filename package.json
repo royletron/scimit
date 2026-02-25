@@ -1,15 +1,46 @@
 {
   "name": "scimmy",
   "version": "1.0.0",
-  "private": true,
-  "workspaces": [
-    "backend",
-    "frontend"
+  "description": "A local SCIM 2.0 sink — capture, inspect, and debug IDP provisioning requests",
+  "type": "module",
+  "bin": {
+    "scimmy": "./dist/cli.js"
+  },
+  "files": [
+    "dist/"
   ],
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm run dev -w scim-watch-backend\" \"npm run dev -w scim-watch-frontend\""
+    "build": "npm run build -w scimmy-frontend && npm run build -w scimmy-cli && npm run build -w scimmy-backend",
+    "start": "node dist/cli.js",
+    "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm run dev -w scimmy-backend\" \"npm run dev -w scimmy-frontend\"",
+    "prepublishOnly": "npm run build"
+  },
+  "workspaces": [
+    "backend",
+    "cli",
+    "frontend"
+  ],
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"
-  }
+  },
+  "engines": {
+    "node": ">=18.3.0"
+  },
+  "keywords": [
+    "scim",
+    "identity",
+    "provisioning",
+    "okta",
+    "entra",
+    "debug"
+  ],
+  "license": "ISC"
 }
