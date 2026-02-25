@@ -23,7 +23,7 @@ export function ConnectorInfo() {
     },
   });
 
-  const baseUrl = `${window.location.protocol}//${window.location.hostname}:3000/scim/v2`;
+  const baseUrl = `${window.location.protocol}//${window.location.host}/scim/v2`;
   const token = tokenData?.token || '';
 
   const copyToClipboard = (text: string, key: string) => {
