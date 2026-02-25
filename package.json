@@ -1,6 +1,6 @@
 {
   "name": "scimit",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A local SCIM 2.0 sink — capture, inspect, and debug IDP provisioning requests",
   "type": "module",
   "bin": {
@@ -42,5 +42,9 @@
     "entra",
     "debug"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/royletron/scimit"
+  },
   "license": "ISC"
 }
