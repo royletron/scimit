@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { randomBytes } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logInfo, logWarn } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -91,10 +92,10 @@ export function initializeDatabase() {
   if (tokenCheck.count === 0) {
     const initialToken = randomBytes(32).toString('hex');
     db.prepare('INSERT INTO bearer_tokens (token, description) VALUES (?, ?)').run(initialToken, 'Initial Token');
-    console.log('Generated initial bearer token:', initialToken);
+    logWarn(`new bearer token generated — copy it from the Connector page`);
   }
 
-  console.log('Database initialized successfully');
+  logInfo('database ready');
 }
 
 export default db;
