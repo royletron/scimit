@@ -11,6 +11,8 @@ export const adminApi = {
   generateToken: (description?: string) => api.post<{ token: string }>('/admin/token/generate', { description }),
   getUsers: () => api.get<User[]>('/admin/users'),
   getGroups: () => api.get<Group[]>('/admin/groups'),
+  getUserLogs: (id: string) => api.get<RequestLog[]>(`/admin/users/${id}/logs`),
+  getGroupLogs: (id: string) => api.get<RequestLog[]>(`/admin/groups/${id}/logs`),
 };
 
 export const logsApi = {
