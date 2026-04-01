@@ -1,7 +1,9 @@
 import Database from 'better-sqlite3';
 import { randomBytes } from 'crypto';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
+import semver from 'semver';
 import { logInfo, logWarn } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -9,6 +11,11 @@ const __dirname = path.dirname(__filename);
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../scim-watch.db');
 const db = new Database(dbPath);
+
+// Read app version from package.json
+const rootPackagePath = path.join(__dirname, '../../../package.json');
+const pkg = JSON.parse(fs.readFileSync(rootPackagePath, 'utf8'));
+const APP_VERSION = pkg.version;
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
@@ -21,9 +28,16 @@ export function initializeDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_info (
       version INTEGER PRIMARY KEY,
+      app_version TEXT,
       applied_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Migration: Add app_version column to schema_info if it doesn't exist
+  const tableInfo = db.prepare("PRAGMA table_info(schema_info)").all() as any[];
+  if (!tableInfo.find(c => c.name === 'app_version')) {
+    db.exec("ALTER TABLE schema_info ADD COLUMN app_version TEXT");
+  }
 
   // Get current version
   let currentVersion = 0;
@@ -35,15 +49,29 @@ export function initializeDatabase() {
     const usersTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").get();
     if (usersTable) {
       currentVersion = 1;
-      db.prepare('INSERT INTO schema_info (version) VALUES (1)').run();
+      db.prepare('INSERT INTO schema_info (version, app_version) VALUES (1, ?)').run(APP_VERSION);
+    }
+  }
+
+  // Check app_version in schema_info
+  const lastVersionRow = db.prepare('SELECT app_version FROM schema_info ORDER BY version DESC, applied_at DESC LIMIT 1').get() as { app_version: string | null };
+  if (lastVersionRow && lastVersionRow.app_version) {
+    if (semver.gt(lastVersionRow.app_version, APP_VERSION)) {
+      console.error(`
+        🚫 Whoa there, time traveler!
+        This database was last used with SCIMit v${lastVersionRow.app_version}.
+        Current SCIMit version is v${APP_VERSION}.
+        Please upgrade SCIMit or use a compatible database.
+      `);
+      process.exit(1);
     }
   }
 
   if (currentVersion > APP_SCHEMA_VERSION) {
     console.error(`
       🚫 Whoa there, time traveler!
-      This database (v${currentVersion}) is from a future version of SCIMit.
-      Current SCIMit version only knows how to handle up to v${APP_SCHEMA_VERSION}.
+      This database (schema v${currentVersion}) is from a future version of SCIMit.
+      Current SCIMit version only knows how to handle up to schema v${APP_SCHEMA_VERSION}.
       Please upgrade SCIMit or use a compatible database.
     `);
     process.exit(1);
@@ -124,7 +152,7 @@ export function initializeDatabase() {
       )
     `);
 
-    db.prepare('INSERT INTO schema_info (version) VALUES (1)').run();
+    db.prepare('INSERT INTO schema_info (version, app_version) VALUES (1, ?)').run(APP_VERSION);
     currentVersion = 1;
   }
 
@@ -134,8 +162,14 @@ export function initializeDatabase() {
       ALTER TABLE request_logs ADD COLUMN user_id TEXT;
       ALTER TABLE request_logs ADD COLUMN group_id TEXT;
     `);
-    db.prepare('INSERT INTO schema_info (version) VALUES (2)').run();
+    db.prepare('INSERT INTO schema_info (version, app_version) VALUES (2, ?)').run(APP_VERSION);
     currentVersion = 2;
+  }
+
+  // Ensure current app version is recorded if we didn't just migrate
+  const latest = db.prepare('SELECT app_version FROM schema_info ORDER BY version DESC, applied_at DESC LIMIT 1').get() as { app_version: string | null };
+  if (!latest || latest.app_version !== APP_VERSION) {
+    db.prepare('INSERT INTO schema_info (version, app_version) VALUES (?, ?)').run(currentVersion, APP_VERSION);
   }
 
   // Generate initial bearer token if none exists
