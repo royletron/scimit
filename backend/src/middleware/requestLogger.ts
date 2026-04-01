@@ -39,13 +39,34 @@ export function requestLogger(req: Request, res: ResponseWithBody, next: NextFun
   res.on('finish', () => {
     const duration = Date.now() - startTime;
 
+    // Try to extract user_id or group_id from path or response body
+    let userId: string | null = null;
+    let groupId: string | null = null;
+
+    const userMatch = req.path.match(/\/Users\/([^\/]+)/);
+    const groupMatch = req.path.match(/\/Groups\/([^\/]+)/);
+
+    if (userMatch) userId = userMatch[1];
+    else if (groupMatch) groupId = groupMatch[1];
+
+    // If it was a POST (create), the ID is in the response body
+    if (res.statusCode === 201 && res._body) {
+      try {
+        const body = typeof res._body === 'string' ? JSON.parse(res._body) : res._body;
+        if (req.path.endsWith('/Users') && body.id) userId = body.id;
+        if (req.path.endsWith('/Groups') && body.id) groupId = body.id;
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
     try {
       const result = db.prepare(`
         INSERT INTO request_logs (
           method, path, status_code, headers, query_params,
           request_body, response_body, response_headers,
-          duration_ms, ip_address, user_agent, timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          duration_ms, ip_address, user_agent, user_id, group_id, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `).run(
         requestData.method,
         requestData.path,
@@ -53,11 +74,13 @@ export function requestLogger(req: Request, res: ResponseWithBody, next: NextFun
         requestData.headers,
         requestData.query_params,
         requestData.request_body,
-        res._body || null,
+        typeof res._body === 'string' ? res._body : JSON.stringify(res._body),
         JSON.stringify(res.getHeaders()),
         duration,
         requestData.ip_address,
-        requestData.user_agent
+        requestData.user_agent,
+        userId,
+        groupId
       );
 
       const raw = db.prepare('SELECT * FROM request_logs WHERE id = ?').get(result.lastInsertRowid) as any;

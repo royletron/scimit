@@ -1,9 +1,59 @@
 import { useState } from 'react';
 import { Group } from '../../types/scim';
 import { JsonBlock } from '../common/JsonBlock';
+import { ActivityLogs } from '../common/ActivityLogs';
+import { useGroupLogs } from '../../hooks/useAssociatedLogs';
 
 interface GroupListProps {
   groups: Group[];
+}
+
+function GroupExpandedRow({ group }: { group: Group }) {
+  const { data: logs, isLoading } = useGroupLogs(group.id);
+  const [tab, setTab] = useState<'members' | 'raw' | 'activity'>('activity');
+
+  const tabClass = (t: typeof tab) =>
+    `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+      tab === t
+        ? 'border-indigo-500 text-indigo-600'
+        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+    }`;
+
+  return (
+    <td colSpan={4} className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+      <div className="flex border-b border-slate-200 mb-4">
+        <button className={tabClass('activity')} onClick={() => setTab('activity')}>Activity</button>
+        <button className={tabClass('members')} onClick={() => setTab('members')}>Members</button>
+        <button className={tabClass('raw')} onClick={() => setTab('raw')}>Raw SCIM Data</button>
+      </div>
+
+      {tab === 'activity' && (
+        <ActivityLogs logs={logs || []} isLoading={isLoading} />
+      )}
+
+      {tab === 'members' && (
+        <div className="space-y-4 text-sm">
+          {group.members && group.members.length > 0 ? (
+            <ul className="space-y-1">
+              {group.members.map((member, idx) => (
+                <li key={idx} className="flex items-center gap-2 text-slate-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                  <span>{member.displayName || member.memberId}</span>
+                  <span className="text-xs text-slate-400">({member.memberType})</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-slate-400 text-sm">No members</p>
+          )}
+        </div>
+      )}
+
+      {tab === 'raw' && (
+        <JsonBlock data={group.rawData} />
+      )}
+    </td>
+  );
 }
 
 export function GroupList({ groups }: GroupListProps) {
@@ -53,30 +103,7 @@ export function GroupList({ groups }: GroupListProps) {
               </tr>
               {expandedId === group.id && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 bg-slate-50 border-t border-slate-100">
-                    <div className="space-y-4 text-sm">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Members</p>
-                        {group.members && group.members.length > 0 ? (
-                          <ul className="space-y-1">
-                            {group.members.map((member, idx) => (
-                              <li key={idx} className="flex items-center gap-2 text-slate-700">
-                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                                <span>{member.displayName || member.memberId}</span>
-                                <span className="text-xs text-slate-400">({member.memberType})</span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-slate-400 text-sm">No members</p>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Raw SCIM Data</p>
-                        <JsonBlock data={group.rawData} />
-                      </div>
-                    </div>
-                  </td>
+                  <GroupExpandedRow group={group} />
                 </tr>
               )}
             </>

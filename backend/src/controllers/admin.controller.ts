@@ -77,4 +77,38 @@ export class AdminController {
       next(error);
     }
   }
+
+  static async getUserLogs(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const logs = LogModel.findByUserId(id);
+      res.json(logs.map(log => ({
+        ...log,
+        headers: log.headers ? JSON.parse(log.headers) : {},
+        query_params: log.query_params ? JSON.parse(log.query_params) : {},
+        request_body: log.request_body ? JSON.parse(log.request_body) : null,
+        response_body: log.response_body ? JSON.parse(log.response_body) : null,
+        response_headers: log.response_headers ? JSON.parse(log.response_headers) : {},
+      })));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getGroupLogs(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const logs = LogModel.findByGroupId(id);
+      res.json(logs.map(log => ({
+        ...log,
+        headers: log.headers ? JSON.parse(log.headers) : {},
+        query_params: log.query_params ? JSON.parse(log.query_params) : {},
+        request_body: log.request_body ? JSON.parse(log.request_body) : null,
+        response_body: log.response_body ? JSON.parse(log.response_body) : null,
+        response_headers: log.response_headers ? JSON.parse(log.response_headers) : {},
+      })));
+    } catch (error) {
+      next(error);
+    }
+  }
 }

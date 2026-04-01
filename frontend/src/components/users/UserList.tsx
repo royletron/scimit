@@ -1,9 +1,38 @@
 import { useState } from 'react';
 import { User } from '../../types/scim';
 import { JsonBlock } from '../common/JsonBlock';
+import { ActivityLogs } from '../common/ActivityLogs';
+import { useUserLogs } from '../../hooks/useAssociatedLogs';
 
 interface UserListProps {
   users: User[];
+}
+
+function UserExpandedRow({ user }: { user: User }) {
+  const { data: logs, isLoading } = useUserLogs(user.id);
+  const [tab, setTab] = useState<'raw' | 'activity'>('activity');
+
+  const tabClass = (t: typeof tab) =>
+    `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+      tab === t
+        ? 'border-indigo-500 text-indigo-600'
+        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+    }`;
+
+  return (
+    <td colSpan={4} className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+      <div className="flex border-b border-slate-200 mb-4">
+        <button className={tabClass('activity')} onClick={() => setTab('activity')}>Activity</button>
+        <button className={tabClass('raw')} onClick={() => setTab('raw')}>Raw SCIM Data</button>
+      </div>
+
+      {tab === 'raw' ? (
+        <JsonBlock data={user.rawData} />
+      ) : (
+        <ActivityLogs logs={logs || []} isLoading={isLoading} />
+      )}
+    </td>
+  );
 }
 
 export function UserList({ users }: UserListProps) {
@@ -81,10 +110,7 @@ export function UserList({ users }: UserListProps) {
                 </tr>
                 {expandedId === user.id && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-4 bg-slate-50 border-t border-slate-100">
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Raw SCIM Data</p>
-                      <JsonBlock data={user.rawData} />
-                    </td>
+                    <UserExpandedRow user={user} />
                   </tr>
                 )}
               </>

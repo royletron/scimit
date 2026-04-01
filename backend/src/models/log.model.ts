@@ -59,6 +59,16 @@ export class LogModel {
     return stmt.get(id) as RequestLog | undefined;
   }
 
+  static findByUserId(userId: string): RequestLog[] {
+    const stmt = db.prepare('SELECT * FROM request_logs WHERE user_id = ? ORDER BY timestamp DESC');
+    return stmt.all(userId) as RequestLog[];
+  }
+
+  static findByGroupId(groupId: string): RequestLog[] {
+    const stmt = db.prepare('SELECT * FROM request_logs WHERE group_id = ? ORDER BY timestamp DESC');
+    return stmt.all(groupId) as RequestLog[];
+  }
+
   static deleteAll(): void {
     db.prepare('DELETE FROM request_logs').run();
   }
