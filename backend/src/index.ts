@@ -11,6 +11,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import scimRoutes from './routes/scim.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import logsRoutes from './routes/logs.routes.js';
+import playbackRoutes from './routes/playback.routes.js';
 import { logRequest, logStartup } from './utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -40,6 +41,7 @@ app.get('/health', (_req, res) => {
 // API routes (no auth required for frontend)
 app.use('/api/admin', adminRoutes);
 app.use('/api/logs', logsRoutes);
+app.use('/api/playback', playbackRoutes);
 
 // SCIM routes (require authentication) — only SCIM requests are logged
 app.use('/scim/v2', requestLogger, authenticateToken, scimRoutes);

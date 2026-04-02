@@ -14,6 +14,8 @@ export interface RequestLog {
   duration_ms: number;
   ip_address?: string;
   user_agent?: string;
+  direction?: string;
+  target_id?: number;
 }
 
 export class LogModel {
@@ -21,6 +23,8 @@ export class LogModel {
     method?: string;
     status?: number;
     path?: string;
+    direction?: string;
+    target_id?: number;
     limit?: number;
     offset?: number;
   }): { logs: RequestLog[], total: number } {
@@ -40,6 +44,16 @@ export class LogModel {
     if (filters?.path) {
       query += ' AND path LIKE ?';
       params.push(`%${filters.path}%`);
+    }
+
+    if (filters?.direction) {
+      query += ' AND direction = ?';
+      params.push(filters.direction);
+    }
+
+    if (filters?.target_id) {
+      query += ' AND target_id = ?';
+      params.push(filters.target_id);
     }
 
     const countStmt = db.prepare(query.replace('SELECT *', 'SELECT COUNT(*) as count'));

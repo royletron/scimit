@@ -65,8 +65,8 @@ export function requestLogger(req: Request, res: ResponseWithBody, next: NextFun
         INSERT INTO request_logs (
           method, path, status_code, headers, query_params,
           request_body, response_body, response_headers,
-          duration_ms, ip_address, user_agent, user_id, group_id, timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+          duration_ms, ip_address, user_agent, user_id, group_id, direction, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'inbound', datetime('now'))
       `).run(
         requestData.method,
         requestData.path,
