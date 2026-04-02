@@ -40,3 +40,20 @@ export interface RequestLog {
   ip_address?: string;
   user_agent?: string;
 }
+
+export interface PlaybackTarget {
+  id: number;
+  name: string;
+  url: string;
+  token?: string;
+  created_at: string;
+}
+
+export interface PlaybackIdMapping {
+  id: number;
+  target_id: number;
+  scimit_id: string;
+  target_id_value: string;
+  entity_type: string;
+  created_at: string;
+}
