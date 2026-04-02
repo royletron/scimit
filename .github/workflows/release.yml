@@ -35,6 +35,8 @@ jobs:
 
       - name: Create Tag and Push
         if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -44,6 +46,6 @@ jobs:
       - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           gh release create ${{ steps.check_tag.outputs.TAG }} --generate-notes
