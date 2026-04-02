@@ -54,3 +54,21 @@ export function useDeleteMapping() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playback-mappings'] }),
   });
 }
+
+export function usePlaybackLog() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ logId, targetId }: { logId: number; targetId: number }) =>
+      playbackApi.playbackLog(logId, targetId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playback-mappings'] }),
+  });
+}
+
+export function usePlaybackEntity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entityType, scimitId, targetId }: { entityType: 'User' | 'Group'; scimitId: string; targetId: number }) =>
+      playbackApi.playbackEntity(entityType, scimitId, targetId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playback-mappings'] }),
+  });
+}

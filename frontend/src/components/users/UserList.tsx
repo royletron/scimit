@@ -3,6 +3,7 @@ import { User } from '../../types/scim';
 import { JsonBlock } from '../common/JsonBlock';
 import { ActivityLogs } from '../common/ActivityLogs';
 import { useUserLogs } from '../../hooks/useAssociatedLogs';
+import { EntityPlaybackPicker } from '../playback/PlaybackPicker';
 
 interface UserListProps {
   users: User[];
@@ -10,7 +11,7 @@ interface UserListProps {
 
 function UserExpandedRow({ user }: { user: User }) {
   const { data: logs, isLoading } = useUserLogs(user.id);
-  const [tab, setTab] = useState<'raw' | 'activity'>('activity');
+  const [tab, setTab] = useState<'raw' | 'activity' | 'push'>('activity');
 
   const tabClass = (t: typeof tab) =>
     `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -24,12 +25,16 @@ function UserExpandedRow({ user }: { user: User }) {
       <div className="flex border-b border-slate-200 mb-4">
         <button className={tabClass('activity')} onClick={() => setTab('activity')}>Activity</button>
         <button className={tabClass('raw')} onClick={() => setTab('raw')}>Raw SCIM Data</button>
+        <button className={tabClass('push')} onClick={() => setTab('push')}>Push to Target</button>
       </div>
 
-      {tab === 'raw' ? (
-        <JsonBlock data={user.rawData} />
-      ) : (
-        <ActivityLogs logs={logs || []} isLoading={isLoading} />
+      {tab === 'raw' && <JsonBlock data={user.rawData} />}
+      {tab === 'activity' && <ActivityLogs logs={logs || []} isLoading={isLoading} />}
+      {tab === 'push' && (
+        <div>
+          <p className="text-xs text-slate-500 mb-3">Push this user to a playback target. If a mapping exists the target will be updated (PUT), otherwise it will be created (POST).</p>
+          <EntityPlaybackPicker entityType="User" scimitId={user.id} />
+        </div>
       )}
     </td>
   );

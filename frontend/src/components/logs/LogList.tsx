@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { RequestLog } from '../../types/scim';
 import { JsonBlock } from '../common/JsonBlock';
+import { LogPlaybackPicker } from '../playback/PlaybackPicker';
 
 interface LogListProps {
   logs: RequestLog[];
@@ -21,7 +22,7 @@ function statusStyle(code: number) {
 }
 
 function LogDetail({ log }: { log: RequestLog }) {
-  const [tab, setTab] = useState<'request' | 'response'>('request');
+  const [tab, setTab] = useState<'request' | 'response' | 'replay'>('request');
 
   const tabClass = (t: typeof tab) =>
     `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -35,6 +36,7 @@ function LogDetail({ log }: { log: RequestLog }) {
       <div className="flex border-b border-slate-200 mb-4">
         <button className={tabClass('request')} onClick={() => setTab('request')}>Request</button>
         <button className={tabClass('response')} onClick={() => setTab('response')}>Response</button>
+        <button className={tabClass('replay')} onClick={() => setTab('replay')}>Replay</button>
       </div>
 
       {tab === 'request' && (
@@ -64,6 +66,13 @@ function LogDetail({ log }: { log: RequestLog }) {
               <JsonBlock data={log.response_body} />
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'replay' && (
+        <div>
+          <p className="text-xs text-slate-500 mb-3">Replay this request to a playback target. IDs in the path and body will be substituted using existing mappings.</p>
+          <LogPlaybackPicker logId={log.id} />
         </div>
       )}
 
