@@ -44,46 +44,44 @@ const db = new Database(dbPath);
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
 
-const APP_SCHEMA_VERSION = 2;
-
 // Initialize database schema
 export function initializeDatabase() {
   // Create schema_info if not exists
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_info (
-      version INTEGER PRIMARY KEY,
-      app_version TEXT,
+      app_version TEXT PRIMARY KEY,
       applied_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  // Migration: Add app_version column to schema_info if it doesn't exist
+  // Check if we need to migrate from the old versioned schema_info
   const tableInfo = db.prepare("PRAGMA table_info(schema_info)").all() as any[];
-  if (!tableInfo.find(c => c.name === 'app_version')) {
-    db.exec("ALTER TABLE schema_info ADD COLUMN app_version TEXT");
+  if (tableInfo.find(c => c.name === 'version')) {
+     logInfo('migrating schema_info to semver-only');
+     // Get the latest app_version we have recorded
+     const latest = db.prepare('SELECT app_version FROM schema_info WHERE app_version IS NOT NULL ORDER BY version DESC LIMIT 1').get() as { app_version: string } | undefined;
+     const lastVer = latest?.app_version || '1.1.0'; // Fallback if we can't find it
+
+     db.exec(`
+       CREATE TABLE schema_info_new (
+         app_version TEXT PRIMARY KEY,
+         applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+       );
+       INSERT INTO schema_info_new (app_version) VALUES ('${lastVer}');
+       DROP TABLE schema_info;
+       ALTER TABLE schema_info_new RENAME TO schema_info;
+     `);
   }
 
-  // Get current version
-  let currentVersion = 0;
-  const row = db.prepare('SELECT MAX(version) as version FROM schema_info').get() as { version: number | null };
-  if (row && row.version !== null) {
-    currentVersion = row.version;
-  } else {
-    // Check if we have existing tables to determine if it's version 1
-    const usersTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").get();
-    if (usersTable) {
-      currentVersion = 1;
-      db.prepare('INSERT INTO schema_info (version, app_version) VALUES (1, ?)').run(APP_VERSION);
-    }
-  }
+  // Get all applied versions
+  const appliedVersions = (db.prepare('SELECT app_version FROM schema_info').all() as { app_version: string }[]).map(v => v.app_version);
 
-  // Check app_version in schema_info
-  const lastVersionRow = db.prepare('SELECT app_version FROM schema_info ORDER BY version DESC, applied_at DESC LIMIT 1').get() as { app_version: string | null };
-  if (lastVersionRow && lastVersionRow.app_version) {
-    if (semver.gt(lastVersionRow.app_version, APP_VERSION)) {
+  // Check for future versions
+  for (const v of appliedVersions) {
+    if (semver.gt(v, APP_VERSION)) {
       console.error(`
         🚫 Whoa there, time traveler!
-        This database was last used with SCIMit v${lastVersionRow.app_version}.
+        This database was last used with SCIMit v${v}.
         Current SCIMit version is v${APP_VERSION}.
         Please upgrade SCIMit or use a compatible database.
       `);
@@ -91,18 +89,10 @@ export function initializeDatabase() {
     }
   }
 
-  if (currentVersion > APP_SCHEMA_VERSION) {
-    console.error(`
-      🚫 Whoa there, time traveler!
-      This database (schema v${currentVersion}) is from a future version of SCIMit.
-      Current SCIMit version only knows how to handle up to schema v${APP_SCHEMA_VERSION}.
-      Please upgrade SCIMit or use a compatible database.
-    `);
-    process.exit(1);
-  }
+  const hasApplied = (v: string) => appliedVersions.includes(v);
 
   // Apply migrations
-  if (currentVersion < 1) {
+  if (!hasApplied('1.1.0') && !db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").get()) {
     logInfo('initializing database (v1)');
     // Users table
     db.exec(`
@@ -160,7 +150,9 @@ export function initializeDatabase() {
         response_headers TEXT,
         duration_ms INTEGER,
         ip_address TEXT,
-        user_agent TEXT
+        user_agent TEXT,
+        direction TEXT DEFAULT 'inbound',
+        target_id INTEGER
       )
     `);
 
@@ -176,25 +168,57 @@ export function initializeDatabase() {
       )
     `);
 
-    db.prepare('INSERT INTO schema_info (version, app_version) VALUES (1, ?)').run(APP_VERSION);
-    currentVersion = 1;
+    db.prepare('INSERT OR IGNORE INTO schema_info (app_version) VALUES (?)').run('1.1.0');
   }
 
-  if (currentVersion < 2) {
-    logInfo('migrating database to v2');
+  if (!hasApplied('1.2.0')) {
+    logInfo('migrating database to 1.2.0');
+    // Ensure the columns exist (might already be there if user is upgrading from a version that had them but wasn't semver-tracked)
+    const logTableInfo = db.prepare("PRAGMA table_info(request_logs)").all() as any[];
+    if (!logTableInfo.find(c => c.name === 'user_id')) {
+      db.exec("ALTER TABLE request_logs ADD COLUMN user_id TEXT");
+    }
+    if (!logTableInfo.find(c => c.name === 'group_id')) {
+      db.exec("ALTER TABLE request_logs ADD COLUMN group_id TEXT");
+    }
+    db.prepare('INSERT OR IGNORE INTO schema_info (app_version) VALUES (?)').run('1.2.0');
+  }
+
+  if (!hasApplied('1.3.0')) {
+    logInfo('migrating database to 1.3.0');
+    const logTableInfo = db.prepare("PRAGMA table_info(request_logs)").all() as any[];
+    if (!logTableInfo.find(c => c.name === 'direction')) {
+      db.exec("ALTER TABLE request_logs ADD COLUMN direction TEXT DEFAULT 'inbound'");
+    }
+    if (!logTableInfo.find(c => c.name === 'target_id')) {
+      db.exec("ALTER TABLE request_logs ADD COLUMN target_id INTEGER");
+    }
+
     db.exec(`
-      ALTER TABLE request_logs ADD COLUMN user_id TEXT;
-      ALTER TABLE request_logs ADD COLUMN group_id TEXT;
+      CREATE TABLE IF NOT EXISTS playback_targets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        token TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS playback_id_mappings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        target_id INTEGER NOT NULL,
+        scimit_id TEXT NOT NULL,
+        target_id_value TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (target_id) REFERENCES playback_targets(id) ON DELETE CASCADE,
+        UNIQUE(target_id, scimit_id, entity_type)
+      );
     `);
-    db.prepare('INSERT INTO schema_info (version, app_version) VALUES (2, ?)').run(APP_VERSION);
-    currentVersion = 2;
+    db.prepare('INSERT OR IGNORE INTO schema_info (app_version) VALUES (?)').run('1.3.0');
   }
 
-  // Ensure current app version is recorded if we didn't just migrate
-  const latest = db.prepare('SELECT app_version FROM schema_info ORDER BY version DESC, applied_at DESC LIMIT 1').get() as { app_version: string | null };
-  if (!latest || latest.app_version !== APP_VERSION) {
-    db.prepare('INSERT INTO schema_info (version, app_version) VALUES (?, ?)').run(currentVersion, APP_VERSION);
-  }
+  // Ensure current app version is recorded
+  db.prepare('INSERT OR IGNORE INTO schema_info (app_version) VALUES (?)').run(APP_VERSION);
 
   // Generate initial bearer token if none exists
   const tokenCheck = db.prepare('SELECT COUNT(*) as count FROM bearer_tokens WHERE active = 1').get() as { count: number };
