@@ -5,6 +5,7 @@ import { UsersPage } from './pages/UsersPage';
 import { GroupsPage } from './pages/GroupsPage';
 import { LogsPage } from './pages/LogsPage';
 import { ConnectorPage } from './pages/ConnectorPage';
+import { PlaybackPage } from './pages/PlaybackPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,7 @@ function App() {
               <Route path="/groups" element={<GroupsPage />} />
               <Route path="/logs" element={<LogsPage />} />
               <Route path="/connector" element={<ConnectorPage />} />
+              <Route path="/playback" element={<PlaybackPage />} />
             </Routes>
           </main>
         </div>

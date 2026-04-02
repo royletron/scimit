@@ -11,6 +11,7 @@ export function Header() {
     { path: '/groups', label: 'Groups' },
     { path: '/logs', label: 'Request Logs' },
     { path: '/connector', label: 'Connector' },
+    { path: '/playback', label: 'Playback' },
   ];
 
   const handleReset = async () => {
