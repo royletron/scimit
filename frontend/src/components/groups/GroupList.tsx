@@ -3,6 +3,7 @@ import { Group } from '../../types/scim';
 import { JsonBlock } from '../common/JsonBlock';
 import { ActivityLogs } from '../common/ActivityLogs';
 import { useGroupLogs } from '../../hooks/useAssociatedLogs';
+import { EntityPlaybackPicker } from '../playback/PlaybackPicker';
 
 interface GroupListProps {
   groups: Group[];
@@ -10,7 +11,7 @@ interface GroupListProps {
 
 function GroupExpandedRow({ group }: { group: Group }) {
   const { data: logs, isLoading } = useGroupLogs(group.id);
-  const [tab, setTab] = useState<'members' | 'raw' | 'activity'>('activity');
+  const [tab, setTab] = useState<'members' | 'raw' | 'activity' | 'push'>('activity');
 
   const tabClass = (t: typeof tab) =>
     `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -25,6 +26,7 @@ function GroupExpandedRow({ group }: { group: Group }) {
         <button className={tabClass('activity')} onClick={() => setTab('activity')}>Activity</button>
         <button className={tabClass('members')} onClick={() => setTab('members')}>Members</button>
         <button className={tabClass('raw')} onClick={() => setTab('raw')}>Raw SCIM Data</button>
+        <button className={tabClass('push')} onClick={() => setTab('push')}>Push to Target</button>
       </div>
 
       {tab === 'activity' && (
@@ -51,6 +53,13 @@ function GroupExpandedRow({ group }: { group: Group }) {
 
       {tab === 'raw' && (
         <JsonBlock data={group.rawData} />
+      )}
+
+      {tab === 'push' && (
+        <div>
+          <p className="text-xs text-slate-500 mb-3">Push this group to a playback target. If a mapping exists the target will be updated (PUT), otherwise it will be created (POST). Member IDs will be substituted using existing mappings.</p>
+          <EntityPlaybackPicker entityType="Group" scimitId={group.id} />
+        </div>
       )}
     </td>
   );
