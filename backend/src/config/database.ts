@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { randomBytes } from 'crypto';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import semver from 'semver';
 import { logInfo, logWarn } from '../utils/logger.js';
@@ -9,13 +10,36 @@ import { logInfo, logWarn } from '../utils/logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../scim-watch.db');
-const db = new Database(dbPath);
+// Helper to find the package.json starting from the current directory
+function findPackageJson(startDir: string): string {
+  let currentDir = startDir;
+  while (currentDir !== path.parse(currentDir).root) {
+    const pkgPath = path.join(currentDir, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      // For monorepo, we want the one with 'scimit' as name
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      if (pkg.name === 'scimit') {
+        return pkgPath;
+      }
+    }
+    currentDir = path.dirname(currentDir);
+  }
+  throw new Error('Could not find root package.json');
+}
 
-// Read app version from package.json
-const rootPackagePath = path.join(__dirname, '../../../package.json');
+const rootPackagePath = findPackageJson(__dirname);
 const pkg = JSON.parse(fs.readFileSync(rootPackagePath, 'utf8'));
-const APP_VERSION = pkg.version;
+export const APP_VERSION = pkg.version;
+
+const dbPath = process.env.DATABASE_PATH || path.join(os.homedir(), '.scimit', 'data.db');
+
+// Ensure the directory for the database exists
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new Database(dbPath);
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');

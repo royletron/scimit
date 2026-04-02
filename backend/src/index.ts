@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
-import { initializeDatabase } from './config/database.js';
+import { initializeDatabase, APP_VERSION } from './config/database.js';
 import { authenticateToken } from './middleware/auth.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -55,7 +56,7 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  logStartup(Number(PORT), process.env.DATABASE_PATH ?? path.join(__dirname, '../../scim-watch.db'));
+  logStartup(Number(PORT), process.env.DATABASE_PATH ?? path.join(os.homedir(), '.scimit', 'data.db'), APP_VERSION);
 });
 
 export default app;
