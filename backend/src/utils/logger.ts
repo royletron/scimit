@@ -41,10 +41,10 @@ export function logRequest(method: string, urlPath: string, status: number, ms: 
 
 // ── Startup ──────────────────────────────────────────────────────────────────
 
-export function logStartup(port: number, dbPath: string): void {
+export function logStartup(port: number, dbPath: string, version: string): void {
   const base = `http://localhost:${port}`;
   process.stdout.write('\n');
-  process.stdout.write(`  ${chalk.bold.hex('#818cf8')('🕺 SCIMit')}  ${chalk.dim('ready')}\n`);
+  process.stdout.write(`  ${chalk.bold.hex('#818cf8')('🕺 SCIMit')} ${chalk.dim('v' + version)}  ${chalk.dim('ready')}\n`);
   process.stdout.write('\n');
   process.stdout.write(`  ${chalk.dim('Dashboard')}  →  ${chalk.cyan.underline(base)}\n`);
   process.stdout.write(`  ${chalk.dim('SCIM')}       →  ${chalk.cyan.underline(`${base}/scim/v2`)}\n`);
