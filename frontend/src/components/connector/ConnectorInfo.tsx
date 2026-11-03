@@ -1,138 +1,111 @@
 import { useState } from 'react';
+import { Check, Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
+import { JsonBlock } from '../common/JsonBlock';
+import { railClass } from '../common/ui';
+import { toast, errorText } from '../common/toast';
+
+function CopyField({ label, value, display, children }: { label: string; value: string; display?: string; children?: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div>
+      <label className="field-label">{label}</label>
+      <div className="flex gap-2">
+        <input type="text" value={display ?? value} readOnly aria-label={label} className="input font-mono text-[13px]" />
+        {children}
+        <button onClick={copy} className="btn btn-secondary w-24">{copied ? <Check size={15} className="text-ok" aria-hidden /> : <Copy size={15} aria-hidden />} {copied ? 'Copied' : 'Copy'}</button>
+      </div>
+    </div>
+  );
+}
+
+const STEPS = [
+  'Open the SCIM provisioning settings for your app in Okta, Entra ID or another IdP.',
+  'Paste the SCIM base URL into the tenant or base URL field.',
+  'Choose bearer token (OAuth bearer) authentication and paste the token.',
+  'Run the IdP’s connection test. The test request appears in Requests.',
+  'Turn on provisioning and assign some users or groups.',
+];
 
 export function ConnectorInfo() {
   const queryClient = useQueryClient();
   const [showToken, setShowToken] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
 
   const { data: tokenData } = useQuery({
     queryKey: ['token'],
-    queryFn: async () => {
-      const response = await adminApi.getToken();
-      return response.data;
-    },
+    queryFn: async () => (await adminApi.getToken()).data,
   });
 
-  const generateMutation = useMutation({
+  const regenerate = useMutation({
     mutationFn: () => adminApi.generateToken(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['token'] });
-      alert('New token generated successfully');
+      toast.success('New token created', 'The old token no longer works. Update your IdP.');
     },
+    onError: (e) => toast.error('Couldn’t create token', errorText(e)),
   });
 
   const baseUrl = `${window.location.protocol}//${window.location.host}/scim/v2`;
   const token = tokenData?.token || '';
+  const masked = token.length > 8 ? `${token.slice(0, 4)}${'•'.repeat(12)}${token.slice(-4)}` : token;
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
-  const maskToken = (token: string) => {
-    if (token.length <= 8) return token;
-    return token.slice(0, 4) + '••••••••' + token.slice(-4);
-  };
-
-  const inputClass = "flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-slate-50 font-mono focus:outline-none";
-  const btnSecondary = "px-3 py-2 text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors";
-  const btnPrimary = "px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors";
-
-  return (
-    <div className="space-y-5">
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">SCIM Endpoint Configuration</h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-              Base URL
-            </label>
-            <div className="flex gap-2">
-              <input type="text" value={baseUrl} readOnly className={inputClass} />
-              <button onClick={() => copyToClipboard(baseUrl, 'url')} className={btnPrimary}>
-                {copied === 'url' ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-              Bearer Token
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={showToken ? token : maskToken(token)}
-                readOnly
-                className={inputClass}
-              />
-              <button onClick={() => setShowToken(!showToken)} className={btnSecondary}>
-                {showToken ? 'Hide' : 'Show'}
-              </button>
-              <button onClick={() => copyToClipboard(token, 'token')} className={btnPrimary}>
-                {copied === 'token' ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-1">
-            <button
-              onClick={() => generateMutation.mutate()}
-              disabled={generateMutation.isPending}
-              className="px-3 py-2 text-sm font-medium bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg transition-colors disabled:opacity-50"
-            >
-              {generateMutation.isPending ? 'Generating…' : 'Generate New Token'}
-            </button>
-            <p className="mt-1.5 text-xs text-slate-400">
-              Generating a new token will invalidate the current one.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-        <h2 className="text-base font-semibold text-slate-900 mb-4">Quick Setup Instructions</h2>
-
-        <div className="space-y-4 text-sm">
-          <div>
-            <p className="font-medium text-slate-700 mb-2">Configure your Identity Provider:</p>
-            <ol className="space-y-1.5 text-slate-600">
-              {[
-                'Navigate to your IDP\'s SCIM provisioning settings (Okta, Entra ID, etc.)',
-                'Enter the SCIM Base URL shown above',
-                'Set authentication type to "OAuth Bearer Token"',
-                'Paste the Bearer Token shown above',
-                'Test the connection',
-                'Enable provisioning',
-              ].map((step, i) => (
-                <li key={i} className="flex gap-2.5">
-                  <span className="shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 text-xs font-semibold flex items-center justify-center">{i + 1}</span>
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <div>
-            <p className="font-medium text-slate-700 mb-2">Test with cURL:</p>
-            <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs leading-relaxed">
-{`# List users
-curl -H "Authorization: Bearer ${token}" \\
+  const curlExample = (t: string) => `# List users
+curl -H "Authorization: Bearer ${t}" \\
   ${baseUrl}/Users
 
 # Create a user
-curl -X POST -H "Authorization: Bearer ${token}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"userName":"test@example.com","active":true}' \\
-  ${baseUrl}/Users`}
-            </pre>
-          </div>
+curl -X POST -H "Authorization: Bearer ${t}" \\
+  -H "Content-Type: application/scim+json" \\
+  -d '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"test@example.com","active":true}' \\
+  ${baseUrl}/Users`;
+
+  const handleRegenerate = () => {
+    if (!confirm('Create a new bearer token? The current token stops working immediately, so your IdP will need the new one.')) return;
+    regenerate.mutate();
+  };
+
+  return (
+    <div className="page-pad space-y-10">
+      <section className={`panel p-6 pl-7 ${railClass('inbound')}`}>
+        <h2 className="section-title">Connection details</h2>
+        <p className="hint mt-1 mb-5">Your IdP needs both of these.</p>
+        <div className="space-y-4 max-w-3xl">
+          <CopyField label="SCIM base URL" value={baseUrl} />
+          <CopyField label="Bearer token" value={token} display={showToken ? token : masked}>
+            <button onClick={() => setShowToken((s) => !s)} className="btn btn-ghost w-20">{showToken ? <EyeOff size={15} aria-hidden /> : <Eye size={15} aria-hidden />} {showToken ? 'Hide' : 'Show'}</button>
+          </CopyField>
         </div>
-      </div>
+        <div className="mt-5 flex items-center gap-3">
+          <button onClick={handleRegenerate} disabled={regenerate.isPending} className="btn btn-secondary btn-sm">
+            <KeyRound size={14} aria-hidden /> {regenerate.isPending ? 'Creating token…' : 'Create new token'}
+          </button>
+        </div>
+      </section>
+
+      <section className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <div>
+          <h2 className="section-title mb-4">Set up your IdP</h2>
+          <ol className="space-y-3">
+            {STEPS.map((step, i) => (
+              <li key={i} className="grid grid-cols-[1.5rem_1fr] gap-2 text-[13.5px] leading-relaxed text-ink">
+                <span className="font-mono text-[13px] text-lagoon font-semibold">{i + 1}</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="min-w-0">
+          <h2 className="section-title mb-1">Try it with curl</h2>
+          <p className="hint mb-4">These requests appear in Requests, the same as IdP traffic.</p>
+          <JsonBlock data={curlExample(showToken ? token : masked)} copyValue={curlExample(token)} />
+        </div>
+      </section>
     </div>
   );
 }

@@ -1,8 +1,10 @@
 export function formatSCIMUser(user: any) {
   const rawData = JSON.parse(user.raw_data);
 
+  // Client-sent raw data first, so SP-owned fields (id, meta) can't be overridden (RFC 7643 §3.1)
   return {
-    schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+    ...rawData,
+    schemas: rawData.schemas ?? ['urn:ietf:params:scim:schemas:core:2.0:User'],
     id: user.id,
     externalId: user.external_id || undefined,
     userName: user.user_name,
@@ -14,7 +16,6 @@ export function formatSCIMUser(user: any) {
       version: `W/"${user.meta_version}"`,
       location: `/scim/v2/Users/${user.id}`
     },
-    ...rawData
   };
 }
 
@@ -28,8 +29,10 @@ export function formatSCIMGroup(group: any, members?: any[]) {
     display: m.display_name
   })) || [];
 
+  // Members come from group_members (raw_data copies go stale after PATCH); SP-owned fields win
   return {
-    schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+    ...rawData,
+    schemas: rawData.schemas ?? ['urn:ietf:params:scim:schemas:core:2.0:Group'],
     id: group.id,
     externalId: group.external_id || undefined,
     displayName: group.display_name,
@@ -41,7 +44,6 @@ export function formatSCIMGroup(group: any, members?: any[]) {
       version: `W/"${group.meta_version}"`,
       location: `/scim/v2/Groups/${group.id}`
     },
-    ...rawData
   };
 }
 

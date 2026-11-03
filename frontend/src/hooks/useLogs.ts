@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { logsApi } from '../services/api';
+import { subscribeLive } from '../services/live';
 
 export function useLogs(filters?: {
   method?: string;
@@ -13,25 +14,20 @@ export function useLogs(filters?: {
   const queryKey = ['logs', filters];
   const limit = filters?.limit ?? 100;
 
-  useEffect(() => {
-    const es = new EventSource('/api/logs/stream');
-
-    es.onmessage = (event) => {
-      const newLog = JSON.parse(event.data);
+  useEffect(() =>
+    subscribeLive((newLog) => {
       queryClient.setQueryData(queryKey, (old: any) => {
-        if (!old) return old;
+        if (!old || old.logs.some((l: any) => l.id === newLog.id)) return old;
         return {
           ...old,
-          logs: [newLog, ...old.logs].slice(0, limit),
+          // _live marks rows that arrived while the page was open, so they can flash in
+          logs: [{ ...newLog, _live: true }, ...old.logs].slice(0, limit),
           total: old.total + 1,
         };
       });
-    };
-
-    es.onerror = () => es.close();
-    return () => es.close();
+    }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  []);
 
   return useQuery({
     queryKey,

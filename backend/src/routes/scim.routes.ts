@@ -1,24 +1,40 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { UserModel } from '../models/user.model.js';
+import { GroupModel } from '../models/group.model.js';
+import { createSCIMError } from '../middleware/errorHandler.js';
 import { UsersController } from '../controllers/users.controller.js';
 import { GroupsController } from '../controllers/groups.controller.js';
 
 const router = Router();
 
+// RFC 7644 §3.14: reject PUT/PATCH/DELETE when If-Match doesn't match the current version
+const ifMatch = (find: (id: string) => { meta_version: number } | undefined) =>
+  (req: Request, _res: Response, next: NextFunction) => {
+    const want = req.headers['if-match'];
+    const current = find(req.params.id as string);
+    if (!want || want === '*' || !current) return next();
+    const tags = want.split(',').map(t => t.trim());
+    if (!tags.includes(`W/"${current.meta_version}"`)) return next(createSCIMError('Resource version does not match If-Match', 412));
+    next();
+  };
+const userMatch = ifMatch(id => UserModel.findById(id));
+const groupMatch = ifMatch(id => GroupModel.findById(id));
+
 // User endpoints
 router.get('/Users', UsersController.listUsers);
 router.get('/Users/:id', UsersController.getUser);
 router.post('/Users', UsersController.createUser);
-router.put('/Users/:id', UsersController.replaceUser);
-router.patch('/Users/:id', UsersController.patchUser);
-router.delete('/Users/:id', UsersController.deleteUser);
+router.put('/Users/:id', userMatch, UsersController.replaceUser);
+router.patch('/Users/:id', userMatch, UsersController.patchUser);
+router.delete('/Users/:id', userMatch, UsersController.deleteUser);
 
 // Group endpoints
 router.get('/Groups', GroupsController.listGroups);
 router.get('/Groups/:id', GroupsController.getGroup);
 router.post('/Groups', GroupsController.createGroup);
-router.put('/Groups/:id', GroupsController.replaceGroup);
-router.patch('/Groups/:id', GroupsController.patchGroup);
-router.delete('/Groups/:id', GroupsController.deleteGroup);
+router.put('/Groups/:id', groupMatch, GroupsController.replaceGroup);
+router.patch('/Groups/:id', groupMatch, GroupsController.patchGroup);
+router.delete('/Groups/:id', groupMatch, GroupsController.deleteGroup);
 
 // ServiceProviderConfig endpoint
 router.get('/ServiceProviderConfig', (req, res) => {

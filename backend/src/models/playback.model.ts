@@ -15,6 +15,8 @@ export interface PlaybackIdMapping {
   target_id_value: string;
   entity_type: string;
   created_at: string;
+  last_synced: string | null; // JSON body the SP last accepted (PATCH diff base)
+  version: string | null;     // SP's ETag / meta.version (If-Match)
 }
 
 export class PlaybackModel {
@@ -59,6 +61,10 @@ export class PlaybackModel {
 
   static findAllMappingsByTarget(target_id: number): PlaybackIdMapping[] {
     return db.prepare('SELECT * FROM playback_id_mappings WHERE target_id = ? ORDER BY created_at DESC').all(target_id) as PlaybackIdMapping[];
+  }
+
+  static saveSyncState(id: number, lastSynced: string | null, version: string | null): void {
+    db.prepare('UPDATE playback_id_mappings SET last_synced = ?, version = ? WHERE id = ?').run(lastSynced, version, id);
   }
 
   static deleteMapping(id: number): void {

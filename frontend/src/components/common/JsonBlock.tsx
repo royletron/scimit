@@ -1,12 +1,15 @@
+import { useState } from 'react';
+import { Check, Copy } from 'lucide-react';
+
 type TokenType = 'key' | 'string' | 'number' | 'boolean' | 'null' | 'punctuation' | 'whitespace';
 
 const TOKEN_COLORS: Record<TokenType, string> = {
-  key:         'text-sky-300',
-  string:      'text-emerald-300',
-  number:      'text-violet-400',
-  boolean:     'text-amber-300',
-  null:        'text-slate-500',
-  punctuation: 'text-slate-400',
+  key:         'text-code-key',
+  string:      'text-code-string',
+  number:      'text-code-number',
+  boolean:     'text-code-number',
+  null:        'text-code-number',
+  punctuation: 'text-code-punct',
   whitespace:  '',
 };
 
@@ -66,19 +69,36 @@ function tokenize(json: string): Array<{ type: TokenType; text: string }> {
 
 interface JsonBlockProps {
   data: unknown;
+  /** What the Copy button copies, when it differs from what's shown (e.g. a masked secret) */
+  copyValue?: string;
 }
 
-export function JsonBlock({ data }: JsonBlockProps) {
-  const json = JSON.stringify(data, null, 2) ?? 'null';
-  const tokens = tokenize(json);
+export function JsonBlock({ data, copyValue }: JsonBlockProps) {
+  const [copied, setCopied] = useState(false);
+  const json = (typeof data === 'string' ? data : JSON.stringify(data, null, 2)) ?? 'null';
+  const tokens = typeof data === 'string' ? [{ type: 'whitespace' as TokenType, text: data }] : tokenize(json);
+
+  const copy = () => {
+    navigator.clipboard.writeText(copyValue ?? json);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
-    <pre className="bg-slate-900 p-4 rounded-lg overflow-x-auto text-xs leading-relaxed">
-      {tokens.map((token, i) => (
-        <span key={i} className={TOKEN_COLORS[token.type]}>
-          {token.text}
-        </span>
-      ))}
-    </pre>
+    <div className="relative group">
+      <pre className="bg-code text-code-fg p-4 rounded-lg overflow-x-auto text-[12.5px] leading-[1.65]">
+        {tokens.map((token, i) => (
+          <span key={i} className={TOKEN_COLORS[token.type]}>
+            {token.text}
+          </span>
+        ))}
+      </pre>
+      <button
+        onClick={copy}
+        className="absolute top-2 right-2 inline-flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium text-[#c4c8d0] bg-white/10 hover:bg-white/20 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+      >
+        {copied ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />} {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
   );
 }

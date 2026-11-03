@@ -39,6 +39,12 @@ export interface RequestLog {
   duration_ms: number;
   ip_address?: string;
   user_agent?: string;
+  direction?: 'inbound' | 'outbound';
+  target_id?: number | null;
+  user_id?: string | null;
+  group_id?: string | null;
+  /** Client-only: arrived over the live stream while the page was open */
+  _live?: boolean;
 }
 
 export interface PlaybackTarget {
@@ -56,4 +62,14 @@ export interface PlaybackIdMapping {
   target_id_value: string;
   entity_type: string;
   created_at: string;
+  version?: string | null;
+}
+
+export interface SyncResult {
+  entityType: 'User' | 'Group';
+  id: string;
+  name: string;
+  status: number;
+  action: 'create' | 'update' | 'delete' | 'unchanged';
+  warnings: string[];
 }

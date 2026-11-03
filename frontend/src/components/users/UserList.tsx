@@ -1,134 +1,144 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
+import { revealRow, useUrlIntent } from '../../hooks/useUrlIntent';
+import { Plus, Search, User as UserIcon } from 'lucide-react';
 import { User } from '../../types/scim';
 import { JsonBlock } from '../common/JsonBlock';
 import { ActivityLogs } from '../common/ActivityLogs';
 import { useUserLogs } from '../../hooks/useAssociatedLogs';
 import { EntityPlaybackPicker } from '../playback/PlaybackPicker';
+import { ScimEditor } from '../common/ScimEditor';
+import { Badge, EmptyState, Tabs, formatTime } from '../common/ui';
+import { adminApi } from '../../services/api';
 
-interface UserListProps {
-  users: User[];
-}
+type Tab = 'activity' | 'raw' | 'edit' | 'push';
 
-function UserExpandedRow({ user }: { user: User }) {
+function UserDetail({ user }: { user: User }) {
   const { data: logs, isLoading } = useUserLogs(user.id);
-  const [tab, setTab] = useState<'raw' | 'activity' | 'push'>('activity');
-
-  const tabClass = (t: typeof tab) =>
-    `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-      tab === t
-        ? 'border-indigo-500 text-indigo-600'
-        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-    }`;
+  const [tab, setTab] = useState<Tab>('activity');
 
   return (
-    <td colSpan={4} className="px-6 py-4 bg-slate-50 border-t border-slate-100">
-      <div className="flex border-b border-slate-200 mb-4">
-        <button className={tabClass('activity')} onClick={() => setTab('activity')}>Activity</button>
-        <button className={tabClass('raw')} onClick={() => setTab('raw')}>Raw SCIM Data</button>
-        <button className={tabClass('push')} onClick={() => setTab('push')}>Push to Target</button>
-      </div>
-
-      {tab === 'raw' && <JsonBlock data={user.rawData} />}
+    <div>
+      <Tabs<Tab>
+        inset
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'activity', label: 'Activity' },
+          { id: 'raw', label: 'SCIM resource' },
+          { id: 'edit', label: 'Edit' },
+          { id: 'push', label: 'Send to SP' },
+        ]}
+      />
       {tab === 'activity' && <ActivityLogs logs={logs || []} isLoading={isLoading} />}
+      <div className="page-pad">
+      {tab === 'raw' && <JsonBlock data={user.rawData} />}
+      {tab === 'edit' && (
+        <div className="panel p-5">
+          <ScimEditor
+            kind="User"
+            initial={user.rawData}
+            onSave={(body) => adminApi.updateUser(user.id, body)}
+            onDone={() => setTab('raw')}
+            onDelete={() => adminApi.deleteUser(user.id)}
+          />
+        </div>
+      )}
       {tab === 'push' && (
         <div>
-          <p className="text-xs text-slate-500 mb-3">Push this user to a playback target. If a mapping exists the target will be updated (PUT), otherwise it will be created (POST).</p>
+          <p className="hint mb-3 max-w-[68ch]">
+            Sends just this user. If the SP already has it, SCIMit updates it with PUT; otherwise it creates it with POST.
+          </p>
           <EntityPlaybackPicker entityType="User" scimitId={user.id} />
         </div>
       )}
-    </td>
+      </div>
+    </div>
   );
 }
 
-export function UserList({ users }: UserListProps) {
+const displayNameOf = (u: User) =>
+  u.rawData?.displayName ||
+  [u.rawData?.name?.givenName, u.rawData?.name?.familyName].filter(Boolean).join(' ') ||
+  null;
+
+export function UserList({ users, onCreate }: { users: User[]; onCreate: () => void }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  useUrlIntent('open', (id) => { setExpandedId(id); revealRow(id); });
   const [search, setSearch] = useState('');
 
-  const filteredUsers = users.filter(user =>
-    user.userName.toLowerCase().includes(search.toLowerCase()) ||
-    user.emailPrimary?.toLowerCase().includes(search.toLowerCase())
+  if (users.length === 0) {
+    return (
+      <div className="page-pad"><EmptyState
+        icon={UserIcon}
+        title="No users yet"
+        action={<button onClick={onCreate} className="btn btn-secondary"><Plus size={16} aria-hidden /> New user</button>}
+      >
+        Point your IdP at the address on <a href="/connector" className="underline underline-offset-2 hover:text-ink">Receive from IdP</a>, or create a user here to send to an SP.
+      </EmptyState></div>
+    );
+  }
+
+  const q = search.toLowerCase();
+  const filtered = users.filter(
+    (u) =>
+      u.userName.toLowerCase().includes(q) ||
+      u.emailPrimary?.toLowerCase().includes(q) ||
+      displayNameOf(u)?.toLowerCase().includes(q)
   );
 
   return (
     <div>
-      <div className="mb-3">
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search by username or email…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          />
-        </div>
-      </div>
+      <div className="page-pad mb-4"><div className="relative max-w-md">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-mute pointer-events-none" aria-hidden />
+        <input
+          type="search"
+          aria-label="Search users"
+          placeholder="Search by name, username or email"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="input pl-9"
+        />
+      </div></div>
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-        <table className="min-w-full">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Username (Email)
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                External ID
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Created
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filteredUsers.map((user) => (
-              <>
-                <tr
-                  key={user.id}
-                  onClick={() => setExpandedId(expandedId === user.id ? null : user.id)}
-                  className="hover:bg-slate-50 cursor-pointer transition-colors"
-                >
-                  <td className="px-6 py-3.5 text-sm font-medium text-slate-900">
-                    {user.userName}
+      <div className="table-wrap"><table className="data-table bleed">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Status</th>
+            <th className="max-md:hidden">External ID</th>
+            <th className="max-md:hidden">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.map((user) => {
+            const open = expandedId === user.id;
+            const name = displayNameOf(user);
+            return (
+              <Fragment key={user.id}>
+                <tr className="row" id={`row-${user.id}`} aria-expanded={open} onClick={() => setExpandedId(open ? null : user.id)}>
+                  <td>
+                    <div className="font-medium text-ink">{name ?? user.userName}</div>
+                    {name && <div className="font-mono text-xs text-graphite mt-0.5">{user.userName}</div>}
                   </td>
-                  <td className="px-6 py-3.5 text-sm">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${
-                        user.active
-                          ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                          : 'bg-red-50 text-red-700 ring-red-600/20'
-                      }`}
-                    >
-                      {user.active ? 'Active' : 'Inactive'}
-                    </span>
+                  <td>
+                    {user.active ? <Badge tone="ok">Active</Badge> : <Badge tone="neutral">Inactive</Badge>}
                   </td>
-                  <td className="px-6 py-3.5 text-sm text-slate-500 font-mono">
-                    {user.externalId || <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-6 py-3.5 text-sm text-slate-500">
-                    {new Date(user.createdAt).toLocaleString()}
-                  </td>
+                  <td className="max-md:hidden font-mono text-xs text-graphite">{user.externalId || <span className="text-mute">none</span>}</td>
+                  <td className="max-md:hidden text-[13px] text-graphite whitespace-nowrap">{formatTime(user.createdAt)}</td>
                 </tr>
-                {expandedId === user.id && (
-                  <tr>
-                    <UserExpandedRow user={user} />
+                {open && (
+                  <tr className="detail">
+                    <td colSpan={4}>
+                      <UserDetail user={user} />
+                    </td>
                   </tr>
                 )}
-              </>
-            ))}
-          </tbody>
-        </table>
-
-        {filteredUsers.length === 0 && (
-          <div className="text-center py-12 text-slate-400 text-sm">
-            {search ? 'No users match your search' : 'No users yet'}
-          </div>
-        )}
-      </div>
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table></div>
+      {filtered.length === 0 && <p className="page-pad py-10 text-center hint">No users match “{search}”.</p>}
     </div>
   );
 }

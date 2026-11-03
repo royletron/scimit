@@ -95,4 +95,12 @@ export class PlaybackController {
       next(error);
     }
   }
+
+  static async sync(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.json(await PlaybackService.syncAll(req.body.targetId, req.body.method === 'PUT' ? 'PUT' : 'PATCH'));
+    } catch (error) {
+      next(error);
+    }
+  }
 }

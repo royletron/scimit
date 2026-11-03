@@ -59,7 +59,7 @@ export class LogModel {
     const countStmt = db.prepare(query.replace('SELECT *', 'SELECT COUNT(*) as count'));
     const { count: total } = countStmt.get(...params) as { count: number };
 
-    query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
+    query += ' ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?';
     params.push(filters?.limit || 100, filters?.offset || 0);
 
     const stmt = db.prepare(query);
@@ -74,12 +74,12 @@ export class LogModel {
   }
 
   static findByUserId(userId: string): RequestLog[] {
-    const stmt = db.prepare('SELECT * FROM request_logs WHERE user_id = ? ORDER BY timestamp DESC');
+    const stmt = db.prepare('SELECT * FROM request_logs WHERE user_id = ? ORDER BY timestamp DESC, id DESC');
     return stmt.all(userId) as RequestLog[];
   }
 
   static findByGroupId(groupId: string): RequestLog[] {
-    const stmt = db.prepare('SELECT * FROM request_logs WHERE group_id = ? ORDER BY timestamp DESC');
+    const stmt = db.prepare('SELECT * FROM request_logs WHERE group_id = ? ORDER BY timestamp DESC, id DESC');
     return stmt.all(groupId) as RequestLog[];
   }
 

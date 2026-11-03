@@ -1,14 +1,13 @@
 import { ConnectorInfo } from '../components/connector/ConnectorInfo';
+import { PageHeader } from '../components/common/ui';
 
 export function ConnectorPage() {
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-slate-900">Connector Configuration</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Use these credentials to configure SCIM provisioning in your Identity Provider.
-        </p>
-      </div>
+      <PageHeader
+        title="Receive from IdP"
+        description="Point Okta, Entra ID or any SCIM 2.0 IdP at SCIMit. Every request it sends is stored and shown in Requests."
+      />
       <ConnectorInfo />
     </div>
   );

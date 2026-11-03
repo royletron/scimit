@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { createSCIMError } from '../middleware/errorHandler.js';
 
 export interface User {
   id: string;
@@ -97,6 +98,7 @@ export class UserModel {
     return this.findById(id);
   }
 
+  // RFC 7644 §3.5.2. Supports: no path (merge), attr, attr.sub, attr[sub eq "v"], attr[sub eq "v"].sub
   static patch(id: string, operations: any[]): User | undefined {
     const existing = this.findById(id);
     if (!existing) return undefined;
@@ -104,37 +106,52 @@ export class UserModel {
     let userData = JSON.parse(existing.raw_data);
 
     for (const op of operations) {
-      if (op.op === 'replace') {
-        if (op.path === 'active') {
-          userData.active = op.value;
-        } else if (op.path) {
-          const pathParts = op.path.split('.');
-          let target = userData;
-          for (let i = 0; i < pathParts.length - 1; i++) {
-            target = target[pathParts[i]];
-          }
-          target[pathParts[pathParts.length - 1]] = op.value;
-        } else {
-          userData = { ...userData, ...op.value };
-        }
-      } else if (op.op === 'add') {
-        if (op.path) {
-          const pathParts = op.path.split('.');
-          let target = userData;
-          for (let i = 0; i < pathParts.length - 1; i++) {
-            target = target[pathParts[i]];
-          }
-          target[pathParts[pathParts.length - 1]] = op.value;
-        }
+      const kind = String(op.op).toLowerCase(); // "op" is case-insensitive in practice (Entra sends "Replace")
+      if (!['add', 'replace', 'remove'].includes(kind)) throw createSCIMError(`Unsupported op "${op.op}"`, 400, 'invalidSyntax');
+      const path: string | undefined = op.path;
+
+      if (!path) {
+        if (kind === 'remove') throw createSCIMError('remove requires a path', 400, 'noTarget');
+        userData = { ...userData, ...op.value };
+        continue;
       }
+
+      const filtered = path.match(/^([^\[]+)\[(\w+) eq "([^"]*)"\](?:\.(\w+))?$/i);
+      if (filtered) {
+        const [, attr, key, val, sub] = filtered;
+        const arr: any[] = Array.isArray(userData[attr]) ? userData[attr] : (userData[attr] = []);
+        let items = arr.filter(x => String(x?.[key]).toLowerCase() === val.toLowerCase());
+        if (kind === 'remove') {
+          if (sub) items.forEach(x => delete x[sub]);
+          else userData[attr] = arr.filter(x => !items.includes(x));
+          continue;
+        }
+        if (items.length === 0) {
+          if (kind === 'replace') throw createSCIMError(`No value matches ${path}`, 400, 'noTarget');
+          items = [{ [key]: val }];
+          arr.push(items[0]);
+        }
+        items.forEach(x => (sub ? (x[sub] = op.value) : Object.assign(x, op.value)));
+        continue;
+      }
+      if (path.includes('[')) throw createSCIMError(`Unsupported path ${path}`, 400, 'invalidPath');
+
+      // Exact top-level key first (covers extension URNs, which contain dots), else dotted sub-attribute
+      const parts = path in userData || !path.includes('.') ? [path] : path.split('.');
+      let target = userData;
+      for (const part of parts.slice(0, -1)) target = target[part] ??= {};
+      const last = parts[parts.length - 1];
+      if (kind === 'remove') delete target[last];
+      else target[last] = op.value;
     }
 
     return this.update(id, userData);
   }
 
   static delete(id: string): boolean {
-    const stmt = db.prepare('DELETE FROM users WHERE id = ?');
-    const result = stmt.run(id);
+    const result = db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    // A deleted user is no longer a member of anything
+    db.prepare('DELETE FROM group_members WHERE member_id = ?').run(id);
     return result.changes > 0;
   }
 

@@ -1,4 +1,4 @@
-import { User, Group, RequestLog, PlaybackTarget, PlaybackIdMapping } from '../types/scim';
+import { User, Group, RequestLog, PlaybackTarget, PlaybackIdMapping, SyncResult } from '../types/scim';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<{ data: T }> {
   const response = await fetch(`/api${path}`, {
@@ -33,6 +33,12 @@ export const adminApi = {
   getGroups: () => request<Group[]>('/admin/groups'),
   getUserLogs: (id: string) => request<RequestLog[]>(`/admin/users/${id}/logs`),
   getGroupLogs: (id: string) => request<RequestLog[]>(`/admin/groups/${id}/logs`),
+  createUser: (body: any) => request('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
+  updateUser: (id: string, body: any) => request(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  createGroup: (body: any) => request('/admin/groups', { method: 'POST', body: JSON.stringify(body) }),
+  updateGroup: (id: string, body: any) => request(`/admin/groups/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteUser: (id: string) => request(`/admin/users/${id}`, { method: 'DELETE' }),
+  deleteGroup: (id: string) => request(`/admin/groups/${id}`, { method: 'DELETE' }),
 };
 
 export const logsApi = {
@@ -76,6 +82,10 @@ export const playbackApi = {
   playbackLog: (logId: number, targetId: number) => request('/playback/playback-log', {
     method: 'POST',
     body: JSON.stringify({ logId, targetId }),
+  }),
+  sync: (targetId: number, method: 'PATCH' | 'PUT') => request<SyncResult[]>('/playback/sync', {
+    method: 'POST',
+    body: JSON.stringify({ targetId, method }),
   }),
   playbackEntity: (entityType: 'User' | 'Group', scimitId: string, targetId: number) => request('/playback/playback-entity', {
     method: 'POST',

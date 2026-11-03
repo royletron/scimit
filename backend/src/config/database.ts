@@ -217,6 +217,11 @@ export function initializeDatabase() {
     db.prepare('INSERT OR IGNORE INTO schema_info (app_version) VALUES (?)').run('1.3.0');
   }
 
+  // Sync state for IdP mode (idempotent column adds)
+  const mappingCols = (db.prepare("PRAGMA table_info(playback_id_mappings)").all() as any[]).map(c => c.name);
+  if (!mappingCols.includes('last_synced')) db.exec('ALTER TABLE playback_id_mappings ADD COLUMN last_synced TEXT');
+  if (!mappingCols.includes('version')) db.exec('ALTER TABLE playback_id_mappings ADD COLUMN version TEXT');
+
   // Ensure current app version is recorded
   db.prepare('INSERT OR IGNORE INTO schema_info (app_version) VALUES (?)').run(APP_VERSION);
 

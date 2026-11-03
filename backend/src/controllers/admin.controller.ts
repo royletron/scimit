@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { UserModel } from '../models/user.model.js';
 import { GroupModel } from '../models/group.model.js';
 import { LogModel } from '../models/log.model.js';
+import db from '../config/database.js';
 import { generateToken, getActiveToken } from '../utils/token.js';
 
 export class AdminController {
@@ -10,6 +11,8 @@ export class AdminController {
       UserModel.deleteAll();
       GroupModel.deleteAll();
       LogModel.deleteAll();
+      // Mappings point at entities that no longer exist; keeping them would make the next sync DELETE everything on targets
+      db.prepare('DELETE FROM playback_id_mappings').run();
 
       res.json({ message: 'All data has been reset successfully' });
     } catch (error) {

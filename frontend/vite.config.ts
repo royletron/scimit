@@ -11,11 +11,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.SCIMIT_API ?? 'http://localhost:3000',
         changeOrigin: true
       },
       '/scim': {
-        target: 'http://localhost:3000',
+        target: process.env.SCIMIT_API ?? 'http://localhost:3000',
         changeOrigin: true
       }
     }

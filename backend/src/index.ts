@@ -44,7 +44,17 @@ app.use('/api/logs', logsRoutes);
 app.use('/api/playback', playbackRoutes);
 
 // SCIM routes (require authentication) — only SCIM requests are logged
-app.use('/scim/v2', requestLogger, authenticateToken, scimRoutes);
+// RFC 7644 §8.1: SCIM responses use application/scim+json (res.json keeps a preset type)
+// RFC 7644 §3.14: single-resource responses carry ETag = meta.version
+app.use('/scim/v2', (_req, res, next) => {
+  res.type('application/scim+json');
+  const json = res.json.bind(res);
+  res.json = (body: any) => {
+    if (body?.meta?.version) res.set('ETag', body.meta.version);
+    return json(body);
+  };
+  next();
+}, requestLogger, authenticateToken, scimRoutes);
 
 // Serve built frontend (production) — skipped transparently in dev
 const publicPath = path.join(__dirname, 'public');

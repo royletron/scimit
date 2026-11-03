@@ -1,128 +1,121 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
+import { revealRow, useUrlIntent } from '../../hooks/useUrlIntent';
+import { Plus, Users } from 'lucide-react';
 import { Group } from '../../types/scim';
 import { JsonBlock } from '../common/JsonBlock';
 import { ActivityLogs } from '../common/ActivityLogs';
 import { useGroupLogs } from '../../hooks/useAssociatedLogs';
 import { EntityPlaybackPicker } from '../playback/PlaybackPicker';
+import { ScimEditor } from '../common/ScimEditor';
+import { EmptyState, Tabs, formatTime } from '../common/ui';
+import { adminApi } from '../../services/api';
 
-interface GroupListProps {
-  groups: Group[];
-}
+type Tab = 'members' | 'activity' | 'raw' | 'edit' | 'push';
 
-function GroupExpandedRow({ group }: { group: Group }) {
+function GroupDetail({ group }: { group: Group }) {
   const { data: logs, isLoading } = useGroupLogs(group.id);
-  const [tab, setTab] = useState<'members' | 'raw' | 'activity' | 'push'>('activity');
-
-  const tabClass = (t: typeof tab) =>
-    `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-      tab === t
-        ? 'border-indigo-500 text-indigo-600'
-        : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-    }`;
+  const [tab, setTab] = useState<Tab>('members');
 
   return (
-    <td colSpan={4} className="px-6 py-4 bg-slate-50 border-t border-slate-100">
-      <div className="flex border-b border-slate-200 mb-4">
-        <button className={tabClass('activity')} onClick={() => setTab('activity')}>Activity</button>
-        <button className={tabClass('members')} onClick={() => setTab('members')}>Members</button>
-        <button className={tabClass('raw')} onClick={() => setTab('raw')}>Raw SCIM Data</button>
-        <button className={tabClass('push')} onClick={() => setTab('push')}>Push to Target</button>
-      </div>
+    <div>
+      <Tabs<Tab>
+        inset
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'members', label: `Members (${group.members.length})` },
+          { id: 'activity', label: 'Activity' },
+          { id: 'raw', label: 'SCIM resource' },
+          { id: 'edit', label: 'Edit' },
+          { id: 'push', label: 'Send to SP' },
+        ]}
+      />
 
-      {tab === 'activity' && (
-        <ActivityLogs logs={logs || []} isLoading={isLoading} />
-      )}
+      {tab === 'members' &&
+        (group.members.length > 0 ? (
+          <ul className="page-pad grid gap-x-8 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+            {group.members.map((m) => (
+              <li key={m.memberId} className="min-w-0">
+                <div className="text-sm text-ink truncate">{m.displayName || 'Unnamed member'}</div>
+                <div className="font-mono text-[11px] text-mute truncate">{m.memberId}</div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="page-pad hint">No members. Add some from the Edit tab.</p>
+        ))}
 
-      {tab === 'members' && (
-        <div className="space-y-4 text-sm">
-          {group.members && group.members.length > 0 ? (
-            <ul className="space-y-1">
-              {group.members.map((member, idx) => (
-                <li key={idx} className="flex items-center gap-2 text-slate-700">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                  <span>{member.displayName || member.memberId}</span>
-                  <span className="text-xs text-slate-400">({member.memberType})</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-slate-400 text-sm">No members</p>
-          )}
+      {tab === 'activity' && <ActivityLogs logs={logs || []} isLoading={isLoading} />}
+      <div className="page-pad">
+      {tab === 'raw' && <JsonBlock data={group.rawData} />}
+      {tab === 'edit' && (
+        <div className="panel p-5">
+          <ScimEditor
+            kind="Group"
+            initial={{ ...group.rawData, displayName: group.displayName, members: group.members }}
+            onSave={(body) => adminApi.updateGroup(group.id, body)}
+            onDone={() => setTab('members')}
+            onDelete={() => adminApi.deleteGroup(group.id)}
+          />
         </div>
       )}
-
-      {tab === 'raw' && (
-        <JsonBlock data={group.rawData} />
-      )}
-
       {tab === 'push' && (
         <div>
-          <p className="text-xs text-slate-500 mb-3">Push this group to a playback target. If a mapping exists the target will be updated (PUT), otherwise it will be created (POST). Member IDs will be substituted using existing mappings.</p>
+          <p className="hint mb-3 max-w-[68ch]">
+            Sends just this group. Members are sent using the SP's IDs, so send the members first (or use Sync all on Send to SP).
+          </p>
           <EntityPlaybackPicker entityType="Group" scimitId={group.id} />
         </div>
       )}
-    </td>
+      </div>
+    </div>
   );
 }
 
-export function GroupList({ groups }: GroupListProps) {
+export function GroupList({ groups, onCreate }: { groups: Group[]; onCreate: () => void }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  useUrlIntent('open', (id) => { setExpandedId(id); revealRow(id); });
+
+  if (groups.length === 0) {
+    return (
+      <div className="page-pad"><EmptyState icon={Users} title="No groups yet" action={<button onClick={onCreate} className="btn btn-secondary"><Plus size={16} aria-hidden /> New group</button>}>
+        Groups pushed by your IdP appear here. You can also create one and pick its members.
+      </EmptyState></div>
+    );
+  }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-      <table className="min-w-full">
-        <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
-            <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Display Name
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Members
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              External ID
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Created
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {groups.map((group) => (
-            <>
-              <tr
-                key={group.id}
-                onClick={() => setExpandedId(expandedId === group.id ? null : group.id)}
-                className="hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <td className="px-6 py-3.5 text-sm font-medium text-slate-900">
-                  {group.displayName}
-                </td>
-                <td className="px-6 py-3.5 text-sm text-slate-500">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                    {group.members?.length || 0}
-                  </span>
-                </td>
-                <td className="px-6 py-3.5 text-sm text-slate-500 font-mono">
-                  {group.externalId || <span className="text-slate-300">—</span>}
-                </td>
-                <td className="px-6 py-3.5 text-sm text-slate-500">
-                  {new Date(group.createdAt).toLocaleString()}
-                </td>
+    <div className="table-wrap"><table className="data-table bleed">
+      <thead>
+        <tr>
+          <th>Group</th>
+          <th>Members</th>
+          <th className="max-md:hidden">External ID</th>
+          <th className="max-md:hidden">Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {groups.map((group) => {
+          const open = expandedId === group.id;
+          return (
+            <Fragment key={group.id}>
+              <tr className="row" id={`row-${group.id}`} aria-expanded={open} onClick={() => setExpandedId(open ? null : group.id)}>
+                <td className="font-medium text-ink">{group.displayName}</td>
+                <td className="font-mono text-[13px] text-graphite">{group.members?.length || 0}</td>
+                <td className="max-md:hidden font-mono text-xs text-graphite">{group.externalId || <span className="text-mute">none</span>}</td>
+                <td className="max-md:hidden text-[13px] text-graphite whitespace-nowrap">{formatTime(group.createdAt)}</td>
               </tr>
-              {expandedId === group.id && (
-                <tr>
-                  <GroupExpandedRow group={group} />
+              {open && (
+                <tr className="detail">
+                  <td colSpan={4}>
+                    <GroupDetail group={group} />
+                  </td>
                 </tr>
               )}
-            </>
-          ))}
-        </tbody>
-      </table>
-
-      {groups.length === 0 && (
-        <div className="text-center py-12 text-slate-400 text-sm">No groups yet</div>
-      )}
-    </div>
+            </Fragment>
+          );
+        })}
+      </tbody>
+    </table></div>
   );
 }

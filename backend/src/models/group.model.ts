@@ -1,5 +1,6 @@
 import db from '../config/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { createSCIMError } from '../middleware/errorHandler.js';
 
 export interface Group {
   id: string;
@@ -127,30 +128,47 @@ export class GroupModel {
     return this.findById(id);
   }
 
+  // RFC 7644 §3.5.2. Members: add/replace/remove "members", remove members[value eq "id"]. Other attributes: by path or no-path value.
   static patch(id: string, operations: any[]): Group | undefined {
     const existing = this.findById(id);
     if (!existing) return undefined;
 
+    const data = JSON.parse(existing.raw_data);
+    delete data.members; // membership lives in group_members
+    let attrsChanged = false;
+    const addMembers = (v: any) => (Array.isArray(v) ? v : [v]).forEach((m: any) => this.addMember(id, m.value, m.type || 'User', m.display));
+    const clearMembers = () => db.prepare('DELETE FROM group_members WHERE group_id = ?').run(id);
+
     for (const op of operations) {
-      if (op.op === 'add' && op.path === 'members') {
-        const members = Array.isArray(op.value) ? op.value : [op.value];
-        for (const member of members) {
-          this.addMember(id, member.value, member.type || 'User', member.display);
-        }
-      } else if (op.op === 'remove' && op.path && op.path.startsWith('members[')) {
-        const match = op.path.match(/members\[value eq "([^"]+)"\]/);
-        if (match) {
-          this.removeMember(id, match[1]);
-        }
-      } else if (op.op === 'replace' && op.path === 'members') {
-        db.prepare('DELETE FROM group_members WHERE group_id = ?').run(id);
-        const members = Array.isArray(op.value) ? op.value : [op.value];
-        for (const member of members) {
-          this.addMember(id, member.value, member.type || 'User', member.display);
-        }
+      const kind = String(op.op).toLowerCase(); // Entra sends "Add"/"Replace"
+      if (!['add', 'replace', 'remove'].includes(kind)) throw createSCIMError(`Unsupported op "${op.op}"`, 400, 'invalidSyntax');
+      const path: string | undefined = op.path;
+
+      if (!path) {
+        if (kind === 'remove') throw createSCIMError('remove requires a path', 400, 'noTarget');
+        const { members, ...rest } = op.value ?? {};
+        if (members !== undefined) { if (kind === 'replace') clearMembers(); addMembers(members); }
+        Object.assign(data, rest);
+        attrsChanged ||= Object.keys(rest).length > 0;
+        continue;
       }
+      if (path.toLowerCase() === 'members') {
+        if (kind !== 'add') clearMembers();
+        if (kind !== 'remove') addMembers(op.value);
+        continue;
+      }
+      const memberFilter = path.match(/^members\[value eq "([^"]+)"\]$/i);
+      if (memberFilter && kind === 'remove') {
+        this.removeMember(id, memberFilter[1]);
+        continue;
+      }
+      if (path.includes('[')) throw createSCIMError(`Unsupported path ${path}`, 400, 'invalidPath');
+      if (kind === 'remove') delete data[path];
+      else data[path] = op.value;
+      attrsChanged = true;
     }
 
+    if (attrsChanged) return this.update(id, data); // no `members` key, so membership is untouched; bumps version
     const newVersion = existing.meta_version + 1;
     db.prepare('UPDATE groups SET updated_at = CURRENT_TIMESTAMP, meta_version = ? WHERE id = ?')
       .run(newVersion, id);

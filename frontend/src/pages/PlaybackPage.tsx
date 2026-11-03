@@ -1,243 +1,250 @@
 import { useState } from 'react';
-import { PlaybackTarget, PlaybackIdMapping } from '../types/scim';
-import {
-  useTargets,
-  useMappings,
-  useCreateTarget,
-  useUpdateTarget,
-  useDeleteTarget,
-  useDeleteMapping,
-} from '../hooks/usePlayback';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { KeyRound, Link2, Unlink, Pencil, Plus, RefreshCw, Send, Trash2, TriangleAlert } from 'lucide-react';
+import { PlaybackTarget, SyncResult } from '../types/scim';
+import { playbackApi } from '../services/api';
+import { useUrlIntent } from '../hooks/useUrlIntent';
+import { useTargets, useMappings, useCreateTarget, useUpdateTarget, useDeleteTarget, useDeleteMapping } from '../hooks/usePlayback';
+import { toast, errorText } from '../components/common/toast';
+import { Badge, EmptyState, ErrorState, Loading, PageHeader, StatusTag, formatTime, railClass } from '../components/common/ui';
 
-// ─── Target Form ────────────────────────────────────────────────────────────
+// ─── Target form ─────────────────────────────────────────────────────────────
 
-interface TargetFormProps {
+type TargetData = { name: string; url: string; token?: string };
+
+function TargetForm({ initial, onSubmit, onCancel, loading }: {
   initial?: PlaybackTarget;
-  onSubmit: (data: { name: string; url: string; token?: string }) => void;
+  onSubmit: (data: TargetData) => void;
   onCancel: () => void;
   loading: boolean;
-}
-
-function TargetForm({ initial, onSubmit, onCancel, loading }: TargetFormProps) {
+}) {
   const [name, setName] = useState(initial?.name ?? '');
   const [url, setUrl] = useState(initial?.url ?? '');
   const [token, setToken] = useState(initial?.token ?? '');
 
-  const inputClass =
-    'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-400';
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({ name, url, token: token || undefined });
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form
+      onSubmit={(e) => { e.preventDefault(); onSubmit({ name, url, token: token || undefined }); }}
+      className="grid gap-4 sm:grid-cols-2 max-w-3xl"
+    >
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Name</label>
-        <input
-          className={inputClass}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Okta Production"
-          required
-        />
+        <label className="field-label" htmlFor="t-name">Name</label>
+        <input id="t-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Staging app" required />
       </div>
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Base URL</label>
-        <input
-          className={inputClass}
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://your-scim-target.example.com/scim/v2"
-          required
-        />
+        <label className="field-label" htmlFor="t-token">Bearer token <span className="text-mute font-normal">(optional)</span></label>
+        <input id="t-token" className="input font-mono" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Leave blank if the SP doesn’t need one" />
       </div>
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Bearer Token (optional)</label>
-        <input
-          className={inputClass}
-          type="password"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="Leave blank if not required"
-        />
+      <div className="sm:col-span-2">
+        <label className="field-label" htmlFor="t-url">SCIM base URL</label>
+        <input id="t-url" className="input font-mono" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://app.example.com/scim/v2" required />
       </div>
-      <div className="flex gap-2 pt-1">
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-        >
-          {loading ? 'Saving…' : initial ? 'Update Target' : 'Add Target'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-        >
-          Cancel
-        </button>
+      <div className="sm:col-span-2 flex gap-2">
+        <button type="submit" disabled={loading} className="btn btn-primary">{loading ? 'Saving…' : initial ? 'Save changes' : 'Add SP'}</button>
+        <button type="button" onClick={onCancel} className="btn btn-ghost">Cancel</button>
       </div>
     </form>
   );
 }
 
-// ─── Mapping List ────────────────────────────────────────────────────────────
+// ─── Sync results ────────────────────────────────────────────────────────────
 
-function MappingRow({ mapping, onDelete }: { mapping: PlaybackIdMapping; onDelete: () => void }) {
+const isFailure = (r: SyncResult) =>
+  (r.status >= 300 || !r.status) && r.action !== 'unchanged' && !(r.action === 'delete' && r.status === 404);
+
+function announceSync(name: string, results: SyncResult[]) {
+  const failed = results.filter(isFailure).length;
+  const warned = results.filter((r) => r.warnings.length).length;
+  if (results.every((r) => r.action === 'unchanged')) return toast.success(`${name} is up to date`, 'Nothing had changed, so no requests were sent.');
+  if (failed) return toast.error(`Sync finished with ${failed} ${failed === 1 ? 'failure' : 'failures'}`, `${name}. Details are below the SP.`);
+  toast.success(`Synced ${name}`, `${results.length} ${results.length === 1 ? 'resource' : 'resources'}${warned ? `, ${warned} with spec warnings` : ''}.`);
+}
+
+const ACTION_LABEL: Record<SyncResult['action'], string> = {
+  create: 'Create',
+  update: 'Update',
+  delete: 'Delete',
+  unchanged: 'No change',
+};
+
+function SyncResults({ results, error }: { results?: SyncResult[]; error: any }) {
+  if (error) return <p className="text-[13px] text-err">Sync didn’t run: {error.detail || error.message}</p>;
+  if (!results?.length) return <p className="hint">Nothing to send. Create some users or groups first.</p>;
+
+  const failed = results.filter(isFailure).length;
+  const warned = results.filter((r) => r.warnings.length).length;
+  if (results.every((r) => r.action === 'unchanged')) {
+    return <p className="text-[13px] text-graphite">The SP is already up to date. No requests were sent.</p>;
+  }
+
   return (
-    <tr className="hover:bg-slate-50 transition-colors">
-      <td className="px-4 py-2.5 text-xs text-slate-500">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${
-          mapping.entity_type === 'User'
-            ? 'bg-blue-50 text-blue-700 ring-blue-600/20'
-            : 'bg-violet-50 text-violet-700 ring-violet-600/20'
-        }`}>
-          {mapping.entity_type}
-        </span>
-      </td>
-      <td className="px-4 py-2.5 text-xs font-mono text-slate-600">{mapping.scimit_id}</td>
-      <td className="px-4 py-2.5 text-xs text-slate-400">→</td>
-      <td className="px-4 py-2.5 text-xs font-mono text-slate-600">{mapping.target_id_value}</td>
-      <td className="px-4 py-2.5 text-xs text-slate-400 whitespace-nowrap">
-        {new Date(mapping.created_at).toLocaleString()}
-      </td>
-      <td className="px-4 py-2.5 text-right">
-        <button
-          onClick={onDelete}
-          className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-        >
-          Delete
-        </button>
-      </td>
-    </tr>
+    <div>
+      <p className="text-[13px] text-graphite mb-3">
+        <span className="text-ink font-medium">{results.length} {results.length === 1 ? 'resource' : 'resources'}</span>
+        {failed ? <span className="text-err">, {failed} failed</span> : ', all succeeded'}
+        {warned > 0 && <span className="text-warn">, {warned} with spec warnings</span>}
+        . Full requests are in Requests.
+      </p>
+      <ul className="panel divide-y divide-line">
+        {results.map((r) => (
+          <li key={r.entityType + r.id} className="px-4 py-2.5">
+            <div className="grid grid-cols-[6.5rem_6rem_3.5rem_1fr] items-center gap-3 text-[13px]">
+              {r.action === 'unchanged' ? <span className="font-mono text-xs text-mute">no request</span> : <StatusTag code={r.status} />}
+              <span className="text-graphite">{ACTION_LABEL[r.action]}</span>
+              <span className="text-mute">{r.entityType}</span>
+              <span className="text-ink truncate">{r.name}</span>
+            </div>
+            {r.warnings.length > 0 && (
+              <ul className="mt-1.5 ml-[18.25rem] space-y-1 max-sm:ml-0">
+                {r.warnings.map((w, i) => (
+                  <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-warn">
+                    <TriangleAlert size={14} className="shrink-0 mt-px" aria-hidden />{w}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
+
+// ─── ID mappings ─────────────────────────────────────────────────────────────
 
 function TargetMappings({ targetId }: { targetId: number }) {
   const { data: mappings, isLoading } = useMappings(targetId);
   const deleteMapping = useDeleteMapping();
 
-  if (isLoading) {
-    return <p className="text-xs text-slate-400 py-2">Loading mappings…</p>;
-  }
-
-  if (!mappings || mappings.length === 0) {
-    return (
-      <p className="text-xs text-slate-400 py-2">
-        No ID mappings yet. Mappings are created automatically when entities are replayed to this target.
-      </p>
-    );
-  }
+  if (isLoading) return <p className="hint">Loading ID mappings…</p>;
+  if (!mappings?.length) return <p className="hint">No ID mappings yet. SCIMit records one each time the SP creates or matches a resource.</p>;
 
   return (
-    <div className="mt-3 border border-slate-200 rounded-lg overflow-hidden">
-      <table className="min-w-full">
-        <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
-            <th className="px-4 py-2 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Type</th>
-            <th className="px-4 py-2 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">SCIMit ID</th>
-            <th className="px-4 py-2" />
-            <th className="px-4 py-2 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Target ID</th>
-            <th className="px-4 py-2 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Created</th>
-            <th className="px-4 py-2" />
+    <div className="table-wrap"><table className="data-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>SCIMit ID</th>
+          <th>SP ID</th>
+          <th>Version</th>
+          <th>Linked</th>
+          <th><span className="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {mappings.map((m) => (
+          <tr key={m.id}>
+            <td className="text-[13px] text-graphite">{m.entity_type}</td>
+            <td className="font-mono text-xs text-graphite">{m.scimit_id}</td>
+            <td className="font-mono text-xs text-ink">{m.target_id_value}</td>
+            <td className="font-mono text-xs text-mute">{m.version ?? 'none'}</td>
+            <td className="text-xs text-graphite whitespace-nowrap">{formatTime(m.created_at)}</td>
+            <td className="text-right">
+              <button onClick={() => deleteMapping.mutate(m.id, { onSuccess: () => toast.success('Mapping forgotten', 'The next sync will look this resource up on the SP again.'), onError: (e) => toast.error('Couldn’t forget mapping', errorText(e)) })} className="btn btn-danger btn-sm" aria-label={`Forget mapping for ${m.scimit_id}`}>
+                <Unlink size={13} aria-hidden /> Forget
+              </button>
+            </td>
           </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {mappings.map((m) => (
-            <MappingRow
-              key={m.id}
-              mapping={m}
-              onDelete={() => deleteMapping.mutate(m.id)}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </table></div>
   );
 }
 
-// ─── Target Card ─────────────────────────────────────────────────────────────
+// ─── Target ──────────────────────────────────────────────────────────────────
 
-interface TargetCardProps {
-  target: PlaybackTarget;
-}
-
-function TargetCard({ target }: TargetCardProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(false);
+function TargetCard({ target }: { target: PlaybackTarget }) {
+  const [view, setView] = useState<'none' | 'edit' | 'mappings'>('none');
+  const [method, setMethod] = useState<'PATCH' | 'PUT'>('PATCH');
   const updateTarget = useUpdateTarget();
   const deleteTarget = useDeleteTarget();
+  const queryClient = useQueryClient();
+  const sync = useMutation({
+    mutationFn: () => playbackApi.sync(target.id, method).then((r) => r.data),
+    onSuccess: (results) => announceSync(target.name, results),
+    onError: (e) => toast.error('Sync didn’t run', errorText(e)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['playback-mappings'] }),
+  });
 
-  const handleUpdate = (data: { name: string; url: string; token?: string }) => {
-    updateTarget.mutate(
-      { id: target.id, data },
-      { onSuccess: () => setEditing(false) }
-    );
-  };
-
+  const toggle = (v: typeof view) => setView((cur) => (cur === v ? 'none' : v));
   const handleDelete = () => {
-    if (!confirm(`Delete target "${target.name}"? This will also remove all its ID mappings.`)) return;
-    deleteTarget.mutate(target.id);
+    if (!confirm(`Remove “${target.name}”? SCIMit forgets its ID mappings. Nothing is deleted on the SP.`)) return;
+    deleteTarget.mutate(target.id, {
+      onSuccess: () => toast.success('SP removed', target.name),
+      onError: (e) => toast.error('Couldn’t remove SP', errorText(e)),
+    });
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-      <div className="px-5 py-4 flex items-start justify-between gap-4">
+    <section className={`panel overflow-hidden ${railClass('outbound')}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">{target.name}</p>
-          <p className="text-xs text-slate-400 font-mono mt-0.5 truncate">{target.url}</p>
-          {target.token && (
-            <span className="mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-              Bearer token configured
-            </span>
-          )}
+          <h2 className="section-title">{target.name}</h2>
+          <p className="font-mono text-xs text-graphite mt-1 truncate">{target.url}</p>
+          <div className="mt-2.5">
+            {target.token
+              ? <Badge tone="ok"><KeyRound size={12} aria-hidden /> Bearer token set</Badge>
+              : <Badge><KeyRound size={12} aria-hidden /> No token</Badge>}
+          </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => { setEditing((e) => !e); setExpanded(false); }}
-            className="text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="Send updates with"
+            value={method}
+            onChange={(e) => setMethod(e.target.value as 'PATCH' | 'PUT')}
+            className="select"
+            title="New resources are always created with POST, and removed ones with DELETE."
           >
-            Edit
-          </button>
-          <button
-            onClick={() => { setExpanded((e) => !e); setEditing(false); }}
-            className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
-          >
-            {expanded ? 'Hide Mappings' : 'View Mappings'}
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleteTarget.isPending}
-            className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors font-medium disabled:opacity-50"
-          >
-            Delete
+            <option value="PATCH">Update with PATCH</option>
+            <option value="PUT">Update with PUT</option>
+          </select>
+          <button onClick={() => sync.mutate()} disabled={sync.isPending} className="btn btn-primary">
+            <RefreshCw size={15} className={sync.isPending ? 'animate-spin' : ''} aria-hidden />
+            {sync.isPending ? 'Syncing…' : 'Sync all'}
           </button>
         </div>
       </div>
 
-      {editing && (
-        <div className="px-5 py-4 border-t border-slate-100 bg-slate-50">
+      <div className="flex gap-1 px-4 pb-3 -mt-1">
+        <button onClick={() => toggle('mappings')} aria-pressed={view === 'mappings'} className={`btn btn-ghost btn-sm ${view === 'mappings' ? 'bg-chalk text-ink' : ''}`}>
+          <Link2 size={14} aria-hidden /> ID mappings
+        </button>
+        <button onClick={() => toggle('edit')} aria-pressed={view === 'edit'} className={`btn btn-ghost btn-sm ${view === 'edit' ? 'bg-chalk text-ink' : ''}`}>
+          <Pencil size={14} aria-hidden /> Edit
+        </button>
+        <button onClick={handleDelete} disabled={deleteTarget.isPending} className="btn btn-danger btn-sm ml-auto">
+          <Trash2 size={14} aria-hidden /> Remove
+        </button>
+      </div>
+
+      {(sync.data || sync.error) && (
+        <div className="px-6 py-5 border-t border-line bg-chalk/60">
+          <SyncResults results={sync.data} error={sync.error} />
+        </div>
+      )}
+      {view === 'edit' && (
+        <div className="px-6 py-5 border-t border-line">
           <TargetForm
             initial={target}
-            onSubmit={handleUpdate}
-            onCancel={() => setEditing(false)}
+            onSubmit={(data) => updateTarget.mutate({ id: target.id, data }, {
+              onSuccess: () => { setView('none'); toast.success('SP updated', data.name); },
+              onError: (e) => toast.error('Couldn’t save SP', errorText(e)),
+            })}
+            onCancel={() => setView('none')}
             loading={updateTarget.isPending}
           />
         </div>
       )}
-
-      {expanded && (
-        <div className="px-5 py-4 border-t border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">ID Mappings</p>
-          <p className="text-xs text-slate-400 mb-2">
-            Tracks how SCIMit IDs correspond to IDs assigned by this target system. Used for ID substitution during replay.
+      {view === 'mappings' && (
+        <div className="px-6 py-5 border-t border-line">
+          <p className="hint mb-3 max-w-[72ch]">
+            How SCIMit’s IDs line up with the IDs this SP assigned. Updates, deletes and group members use the SP’s IDs. Forget a mapping to make the next sync look the resource up again.
           </p>
           <TargetMappings targetId={target.id} />
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -246,78 +253,54 @@ function TargetCard({ target }: TargetCardProps) {
 export function PlaybackPage() {
   const { data: targets, isLoading, error } = useTargets();
   const createTarget = useCreateTarget();
-  const [showForm, setShowForm] = useState(false);
+  const [adding, setAdding] = useState(false);
+  useUrlIntent('new', () => setAdding(true));
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-16 text-slate-400 text-sm gap-2">
-        <svg className="animate-spin h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-        Loading targets…
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center py-16 text-red-500 text-sm gap-2">
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        Error loading playback targets
-      </div>
-    );
-  }
+  if (isLoading) return <Loading label="Loading SPs…" />;
+  if (error) return <ErrorState title="Couldn't load SPs" detail="Check that the SCIMit server is running." />;
 
   const count = targets?.length ?? 0;
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <div className="flex items-baseline gap-2">
-            <h2 className="text-xl font-semibold text-slate-900">Playback</h2>
-            <span className="text-sm text-slate-400">{count} {count === 1 ? 'target' : 'targets'}</span>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            Configure SCIM targets to replay captured requests or push entities. ID mappings are tracked automatically.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="shrink-0 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          {showForm ? 'Cancel' : 'Add Target'}
-        </button>
-      </div>
+      <PageHeader
+        title="Send to SP"
+        meta={`${count} ${count === 1 ? 'SP' : 'SPs'}`}
+        description="SCIMit acts as the IdP here. Sync all creates or updates every user and group on the SP, then deletes anything you’ve removed. Each response is checked against the SCIM spec."
+        actions={!adding && <button onClick={() => setAdding(true)} className="btn btn-primary"><Plus size={16} aria-hidden /> Add SP</button>}
+      />
 
-      {showForm && (
-        <div className="mb-6 bg-white border border-slate-200 rounded-xl shadow-sm px-5 py-5">
-          <p className="text-sm font-semibold text-slate-900 mb-4">New Playback Target</p>
+      <div className="page-pad">
+      {adding && (
+        <section className="panel p-6 mb-6">
+          <h2 className="section-title mb-4">Add an SP</h2>
           <TargetForm
-            onSubmit={(data) => createTarget.mutate(data, { onSuccess: () => setShowForm(false) })}
-            onCancel={() => setShowForm(false)}
+            onSubmit={(data) => createTarget.mutate(data, {
+              onSuccess: () => { setAdding(false); toast.success('SP added', data.name); },
+              onError: (e) => toast.error('Couldn’t add SP', errorText(e)),
+            })}
+            onCancel={() => setAdding(false)}
             loading={createTarget.isPending}
           />
-        </div>
+        </section>
       )}
 
-      {targets && targets.length > 0 ? (
-        <div className="space-y-3">
-          {targets.map((target) => (
-            <TargetCard key={target.id} target={target} />
-          ))}
+      {count > 0 ? (
+        <div className="space-y-5">
+          {targets!.map((t) => <TargetCard key={t.id} target={t} />)}
         </div>
       ) : (
-        !showForm && (
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm text-center py-16">
-            <p className="text-slate-400 text-sm mb-1">No playback targets configured</p>
-            <p className="text-slate-400 text-xs">Add a target to start replaying SCIM requests to another system.</p>
-          </div>
+        !adding && (
+          <EmptyState
+            icon={Send}
+            title="No SPs yet"
+            action={<button onClick={() => setAdding(true)} className="btn btn-secondary"><Plus size={16} aria-hidden /> Add SP</button>}
+          >
+            Add the SCIM base URL of the app you’re testing. SCIMit will provision your users and groups into it, the way Okta or Entra would.
+          </EmptyState>
         )
       )}
+      </div>
     </div>
   );
 }

@@ -14,5 +14,6 @@ router.get('/entity/:id/mappings', PlaybackController.getEntityMappings);
 
 router.post('/playback-log', PlaybackController.playbackLog);
 router.post('/playback-entity', PlaybackController.playbackEntity);
+router.post('/sync', PlaybackController.sync);
 
 export default router;
