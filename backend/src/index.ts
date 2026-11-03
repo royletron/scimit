@@ -60,7 +60,8 @@ app.use('/scim/v2', (_req, res, next) => {
 const publicPath = path.join(__dirname, 'public');
 if (fs.existsSync(path.join(publicPath, 'index.html'))) {
   app.use(express.static(publicPath));
-  app.get('/{*path}', (_req, res) => res.sendFile(path.join(publicPath, 'index.html')));
+  // root option: send() ignores paths with dot-folders (e.g. ~/.npm/_npx/…) unless they sit above `root`
+  app.get('/{*path}', (_req, res) => res.sendFile('index.html', { root: publicPath }));
 }
 
 // Error handler

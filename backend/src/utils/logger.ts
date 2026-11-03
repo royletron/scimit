@@ -53,12 +53,24 @@ export function logStartup(port: number, dbPath: string, version: string): void 
   startWaiting();
 }
 
+// All log lines clear the spinner first and redraw it after, so they never land mid-line
+function writeLine(line: string, stream: NodeJS.WriteStream = process.stdout): void {
+  clearWaiting();
+  stream.write(line + '\n');
+  if (spinnerTimer) drawWaiting();
+}
+
 export function logInfo(msg: string): void {
-  process.stdout.write(`  ${chalk.dim('·')} ${chalk.dim(msg)}\n`);
+  writeLine(`  ${chalk.dim('·')} ${chalk.dim(msg)}`);
 }
 
 export function logWarn(msg: string): void {
-  process.stdout.write(`  ${chalk.yellow('!')} ${chalk.yellow(msg)}\n`);
+  writeLine(`  ${chalk.yellow('!')} ${chalk.yellow(msg)}`);
+}
+
+export function logError(msg: string, detail?: string): void {
+  writeLine(`  ${chalk.red('✖')} ${chalk.red(msg)}`);
+  if (detail) writeLine(chalk.dim(detail.replace(/^/gm, '    ')));
 }
 
 // ── Animated waiting line ─────────────────────────────────────────────────────

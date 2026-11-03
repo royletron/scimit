@@ -6,6 +6,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import semver from 'semver';
 import { logInfo, logWarn } from '../utils/logger.js';
+import { explainNativeLoadError } from '../utils/native-error.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,7 +40,15 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new Database(dbPath);
+let db: Database.Database;
+try {
+  db = new Database(dbPath);
+} catch (err) {
+  const help = explainNativeLoadError(err);
+  if (!help) throw err;
+  console.error(help);
+  process.exit(1);
+}
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
