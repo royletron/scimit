@@ -2,6 +2,11 @@
 
 All notable changes to SCIMit. New entries are drafted from `feat:` and `fix:` commits when the version is bumped (see `scripts/changelog.mjs`).
 
+## [1.6.0] - 2026-11-04
+### Added
+- What's new page listing every SCIMit release. A dot appears in the sidebar when there's one you haven't seen.
+- `CHANGELOG.md` entries are drafted automatically from commits when the version is bumped.
+
 ## [1.5.1] - 2026-11-03
 ### Fixed
 - The dashboard returned 404 for every page when run with `npx scimit`.
