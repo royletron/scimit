@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, CornerDownLeft, Inbox, LucideIcon, Moon, Plus, Search, Send, User, Users } from 'lucide-react';
+import { Activity, CornerDownLeft, Gift, Inbox, LucideIcon, Moon, Plus, Search, Send, User, Users } from 'lucide-react';
 import { useUsers } from '../../hooks/useUsers';
 import { useGroups } from '../../hooks/useGroups';
 import { useTargets } from '../../hooks/usePlayback';
@@ -91,6 +91,7 @@ export function CommandPalette() {
       { id: 'p-groups', section: 'Go to', label: 'Groups', icon: Users, run: go('/groups') },
       { id: 'p-logs', section: 'Go to', label: 'Requests', icon: Activity, run: go('/logs') },
       { id: 'p-in', section: 'Go to', label: 'Receive from IdP', sub: 'connection details, bearer token', icon: Inbox, tone: 'text-lagoon', run: go('/connector') },
+      { id: 'p-new', section: 'Go to', label: 'What’s new', sub: 'changelog, release notes', icon: Gift, run: go('/changelog') },
       { id: 'p-out', section: 'Go to', label: 'Send to SP', sub: 'targets, sync', icon: Send, tone: 'text-disco', run: go('/playback') },
       ...(users ?? []).map((u) => ({
         id: `u-${u.id}`, section: 'Users', icon: User,

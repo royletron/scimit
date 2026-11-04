@@ -8,6 +8,7 @@ import { GroupsPage } from './pages/GroupsPage';
 import { LogsPage } from './pages/LogsPage';
 import { ConnectorPage } from './pages/ConnectorPage';
 import { PlaybackPage } from './pages/PlaybackPage';
+import { ChangelogPage } from './pages/ChangelogPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,7 @@ function App() {
               <Route path="/logs" element={<LogsPage />} />
               <Route path="/connector" element={<ConnectorPage />} />
               <Route path="/playback" element={<PlaybackPage />} />
+              <Route path="/changelog" element={<ChangelogPage />} />
             </Routes>
           </main>
           <Toaster />

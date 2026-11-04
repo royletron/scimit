@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Activity, Inbox, LucideIcon, Moon, RotateCcw, Search, Send, Sun, User, Users } from 'lucide-react';
+import { Activity, Gift, Inbox, LucideIcon, Moon, RotateCcw, Search, Send, Sun, User, Users } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
 import { subscribeLive } from '../../services/live';
@@ -10,6 +10,7 @@ import { useTargets } from '../../hooks/usePlayback';
 import { useTheme } from '../../hooks/useTheme';
 import { toast } from '../common/toast';
 import { openPalette } from '../common/CommandPalette';
+import { latestVersion, useWhatsNew } from '../../hooks/useWhatsNew';
 
 interface Item {
   to: string;
@@ -61,6 +62,7 @@ export function Sidebar() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const { theme, toggle } = useTheme();
+  const { unseen } = useWhatsNew();
   const { data: users } = useUsers();
   const { data: groups } = useGroups();
   const { data: targets } = useTargets();
@@ -135,6 +137,16 @@ export function Sidebar() {
       </nav>
 
       <div className="hidden md:flex flex-col gap-0.5 px-3 pb-4">
+        <NavLink
+          to="/changelog"
+          className={({ isActive }) => `btn btn-ghost btn-sm w-full justify-start ${isActive ? 'bg-paper text-ink shadow-[0_0_0_1px_var(--color-line)]' : ''}`}
+        >
+          <Gift size={14} aria-hidden />
+          <span className="flex-1 text-left">What’s new</span>
+          {unseen
+            ? <span className="h-2 w-2 rounded-full bg-ink" aria-label="New release" />
+            : <span className="font-mono text-[11px] text-mute">v{latestVersion}</span>}
+        </NavLink>
         <button onClick={toggle} className="btn btn-ghost btn-sm w-full justify-start">
           {theme === 'dark' ? <Sun size={14} aria-hidden /> : <Moon size={14} aria-hidden />}
           {theme === 'dark' ? 'Light theme' : 'Dark theme'}

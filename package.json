@@ -13,7 +13,8 @@
     "build": "npm run build -w scimit-frontend && npm run build -w scimit-cli && npm run build -w scimit-backend",
     "start": "node dist/cli.js",
     "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm run dev -w scimit-backend\" \"npm run dev -w scimit-frontend\"",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "version": "node scripts/changelog.mjs && git add CHANGELOG.md"
   },
   "workspaces": [
     "backend",
