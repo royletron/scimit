@@ -20,6 +20,7 @@ router.post('/groups', GroupsController.createGroup);
 router.put('/groups/:id', GroupsController.replaceGroup);
 // Local delete; the next sync deprovisions it on targets (DELETE)
 router.delete('/users/:id', UsersController.deleteUser);
+router.put('/users/:id/groups', AdminController.setUserGroups);
 router.delete('/groups/:id', GroupsController.deleteGroup);
 
 export default router;

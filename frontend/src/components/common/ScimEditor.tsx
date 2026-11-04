@@ -1,8 +1,38 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Braces, Check, Rows3, Trash2 } from 'lucide-react';
 import { useUsers } from '../../hooks/useUsers';
+import { useGroups } from '../../hooks/useGroups';
+import { adminApi } from '../../services/api';
 import { toast } from './toast';
+
+// Tick-list used for a group's members and a user's groups
+function Checklist({ label, items, selected, onToggle, empty, mono }: {
+  label: string;
+  items: { id: string; label: string }[];
+  selected: string[];
+  onToggle: (id: string) => void;
+  empty: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <p className="field-label">{label} <span className="text-mute font-normal">({selected.length} selected)</span></p>
+      {items.length > 0 ? (
+        <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((it) => (
+            <label key={it.id} className="flex items-center gap-2 text-[13px] text-ink min-w-0 cursor-pointer">
+              <input className="h-4 w-4 accent-ink shrink-0" type="checkbox" checked={selected.includes(it.id)} onChange={() => onToggle(it.id)} />
+              <span className={`truncate ${mono ? 'font-mono text-xs' : ''}`}>{it.label}</span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="hint">{empty}</p>
+      )}
+    </div>
+  );
+}
 
 export const USER_TEMPLATE = {
   schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -79,17 +109,27 @@ interface ScimEditorProps {
   onDone?: () => void;
   onDelete?: () => Promise<unknown>;
   saveLabel?: string;
+  /** The user's ID when editing a user, so their group memberships can be shown and changed */
+  resourceId?: string;
 }
 
-export function ScimEditor({ kind, initial, onSave, onDone, onDelete, saveLabel = 'Save changes' }: ScimEditorProps) {
+export function ScimEditor({ kind, initial, onSave, onDone, onDelete, saveLabel = 'Save changes', resourceId }: ScimEditorProps) {
   const queryClient = useQueryClient();
   const { data: users } = useUsers();
+  const { data: groups } = useGroups();
   const { id: _id, meta: _meta, members, ...editable } = initial ?? {};
   const [doc, setDoc] = useState<Doc>(editable);
   const [mode, setMode] = useState<'simple' | 'advanced'>('simple');
   const [text, setText] = useState('');
   const [selected, setSelected] = useState<string[]>((members ?? []).map((m: any) => m.value ?? m.memberId));
   const [error, setError] = useState<string | null>(null);
+  // A user's groups: what they're in now, until the picker is touched
+  const currentGroupIds = useMemo(
+    () => (resourceId ? (groups ?? []).filter((g) => g.members.some((m) => m.memberId === resourceId)).map((g) => g.id) : []),
+    [groups, resourceId]
+  );
+  const [groupIds, setGroupIds] = useState<string[] | null>(null);
+  const selectedGroups = groupIds ?? currentGroupIds;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -99,7 +139,13 @@ export function ScimEditor({ kind, initial, onSave, onDone, onDelete, saveLabel 
   const nameOf = (d: Doc) => (kind === 'User' ? d.userName : d.displayName);
   // Create forms have no delete; edit forms do
   const save = useMutation({
-    mutationFn: onSave,
+    // Save the resource, then (for users) its group memberships, which live on the groups
+    mutationFn: async (body: Doc) => {
+      const result: any = await onSave(body);
+      const userId = resourceId ?? result?.data?.id;
+      if (kind === 'User' && groupIds !== null && userId) await adminApi.setUserGroups(userId, groupIds);
+      return result;
+    },
     onSuccess: (_r, body) => {
       invalidate();
       toast.success(onDelete ? 'Changes saved' : `${kind} created`, nameOf(body));
@@ -217,21 +263,19 @@ export function ScimEditor({ kind, initial, onSave, onDone, onDelete, saveLabel 
       )}
 
       {kind === 'Group' && (
-        <div>
-          <p className="field-label">Members <span className="text-mute font-normal">({selected.length} selected)</span></p>
-          {users && users.length > 0 ? (
-            <div className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
-              {users.map((u) => (
-                <label key={u.id} className="flex items-center gap-2 text-[13px] text-ink min-w-0 cursor-pointer">
-                  <input className="h-4 w-4 accent-ink shrink-0" type="checkbox" checked={selected.includes(u.id)} onChange={() => toggle(u.id)} />
-                  <span className="font-mono text-xs truncate">{u.userName}</span>
-                </label>
-              ))}
-            </div>
-          ) : (
-            <p className="hint">No users yet. Create some first, then add them here.</p>
-          )}
-        </div>
+        <Checklist
+          label="Members" mono selected={selected} onToggle={toggle}
+          items={(users ?? []).map((u) => ({ id: u.id, label: u.userName }))}
+          empty="No users yet. Create some first, then add them here."
+        />
+      )}
+      {kind === 'User' && (
+        <Checklist
+          label="Groups" selected={selectedGroups}
+          onToggle={(id) => setGroupIds(selectedGroups.includes(id) ? selectedGroups.filter((g) => g !== id) : [...selectedGroups, id])}
+          items={(groups ?? []).map((g) => ({ id: g.id, label: g.displayName }))}
+          empty="No groups yet. Create one on Groups, then add this user here."
+        />
       )}
 
       {mode === 'simple' && (

@@ -9,6 +9,7 @@ import { EntityPlaybackPicker } from '../playback/PlaybackPicker';
 import { ScimEditor } from '../common/ScimEditor';
 import { Badge, EmptyState, Tabs, formatTime } from '../common/ui';
 import { adminApi } from '../../services/api';
+import { useGroups } from '../../hooks/useGroups';
 
 type Tab = 'activity' | 'raw' | 'edit' | 'push';
 
@@ -36,6 +37,7 @@ function UserDetail({ user }: { user: User }) {
         <div className="panel p-5">
           <ScimEditor
             kind="User"
+            resourceId={user.id}
             initial={user.rawData}
             onSave={(body) => adminApi.updateUser(user.id, body)}
             onDone={() => setTab('raw')}
@@ -56,6 +58,17 @@ function UserDetail({ user }: { user: User }) {
   );
 }
 
+function GroupNames({ names }: { names: string[] }) {
+  if (names.length === 0) return <span className="text-[13px] text-mute">none</span>;
+  const shown = names.slice(0, 2);
+  return (
+    <span className="flex flex-wrap items-center gap-1" title={names.join(', ')}>
+      {shown.map((n) => <Badge key={n}>{n}</Badge>)}
+      {names.length > shown.length && <span className="text-xs text-graphite">+{names.length - shown.length}</span>}
+    </span>
+  );
+}
+
 const displayNameOf = (u: User) =>
   u.rawData?.displayName ||
   [u.rawData?.name?.givenName, u.rawData?.name?.familyName].filter(Boolean).join(' ') ||
@@ -65,6 +78,8 @@ export function UserList({ users, onCreate }: { users: User[]; onCreate: () => v
   const [expandedId, setExpandedId] = useState<string | null>(null);
   useUrlIntent('open', (id) => { setExpandedId(id); revealRow(id); });
   const [search, setSearch] = useState('');
+  const { data: groups } = useGroups();
+  const groupsOf = (id: string) => (groups ?? []).filter((g) => g.members.some((m) => m.memberId === id)).map((g) => g.displayName);
 
   if (users.length === 0) {
     return (
@@ -105,6 +120,7 @@ export function UserList({ users, onCreate }: { users: User[]; onCreate: () => v
           <tr>
             <th>User</th>
             <th>Status</th>
+            <th className="max-md:hidden">Groups</th>
             <th className="max-md:hidden">External ID</th>
             <th className="max-md:hidden">Created</th>
           </tr>
@@ -123,12 +139,13 @@ export function UserList({ users, onCreate }: { users: User[]; onCreate: () => v
                   <td>
                     {user.active ? <Badge tone="ok">Active</Badge> : <Badge tone="neutral">Inactive</Badge>}
                   </td>
+                  <td className="max-md:hidden"><GroupNames names={groupsOf(user.id)} /></td>
                   <td className="max-md:hidden font-mono text-xs text-graphite">{user.externalId || <span className="text-mute">none</span>}</td>
                   <td className="max-md:hidden text-[13px] text-graphite whitespace-nowrap">{formatTime(user.createdAt)}</td>
                 </tr>
                 {open && (
                   <tr className="detail">
-                    <td colSpan={4}>
+                    <td colSpan={5}>
                       <UserDetail user={user} />
                     </td>
                   </tr>

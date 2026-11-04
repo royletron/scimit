@@ -92,6 +92,24 @@ export class GroupModel {
     stmt.run(groupId, memberId, memberType, displayName || null);
   }
 
+  /** Make `memberId` a member of exactly `groupIds`. Returns the groups that changed (their versions are bumped). */
+  static setMemberships(memberId: string, groupIds: string[], displayName?: string): string[] {
+    const want = new Set(groupIds);
+    const has = new Set((db.prepare('SELECT group_id FROM group_members WHERE member_id = ?').all(memberId) as { group_id: string }[]).map((r) => r.group_id));
+    const changed = [
+      ...[...want].filter((g) => !has.has(g) && this.findById(g)),
+      ...[...has].filter((g) => !want.has(g)),
+    ];
+    db.transaction(() => {
+      for (const g of changed) {
+        if (want.has(g)) this.addMember(g, memberId, 'User', displayName);
+        else this.removeMember(g, memberId);
+        db.prepare('UPDATE groups SET updated_at = CURRENT_TIMESTAMP, meta_version = meta_version + 1 WHERE id = ?').run(g);
+      }
+    })();
+    return changed;
+  }
+
   static removeMember(groupId: string, memberId: string): void {
     const stmt = db.prepare('DELETE FROM group_members WHERE group_id = ? AND member_id = ?');
     stmt.run(groupId, memberId);

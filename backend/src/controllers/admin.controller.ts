@@ -98,6 +98,21 @@ export class AdminController {
     }
   }
 
+  static async setUserGroups(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = UserModel.findById(req.params.id as string);
+      if (!user) return res.status(404).json({ detail: 'User not found' });
+      const groupIds = req.body?.groupIds;
+      if (!Array.isArray(groupIds) || !groupIds.every((g) => typeof g === 'string')) {
+        return res.status(400).json({ detail: 'groupIds must be an array of group IDs' });
+      }
+      const changed = GroupModel.setMemberships(user.id, groupIds, user.user_name);
+      res.json({ changed });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getGroupLogs(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
