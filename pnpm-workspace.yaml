@@ -1,2 +1,9 @@
+packages:
+  - backend
+  - cli
+  - frontend
+
+# Packages allowed to run install scripts: better-sqlite3 builds/downloads its native driver, esbuild sets up Vite's bundler
 allowBuilds:
-  better-sqlite3: false
+  better-sqlite3: true
+  esbuild: true
