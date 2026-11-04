@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 
-type TokenType = 'key' | 'string' | 'number' | 'boolean' | 'null' | 'punctuation' | 'whitespace';
+type TokenType = 'key' | 'string' | 'number' | 'boolean' | 'null' | 'punctuation' | 'whitespace' | 'tag' | 'attr';
 
 const TOKEN_COLORS: Record<TokenType, string> = {
   key:         'text-code-key',
@@ -11,7 +11,43 @@ const TOKEN_COLORS: Record<TokenType, string> = {
   null:        'text-code-number',
   punctuation: 'text-code-punct',
   whitespace:  '',
+  tag:         'text-code-tag',
+  attr:        'text-code-attr',
 };
+
+// XML (SAML requests and responses): <tag attr="value">text</tag>, plus comments and <?xml ?> declarations
+export function tokenizeXml(xml: string): Array<{ type: TokenType; text: string }> {
+  const tokens: Array<{ type: TokenType; text: string }> = [];
+  const push = (type: TokenType, text: string) => text && tokens.push({ type, text });
+  let last = 0;
+  for (const m of xml.matchAll(/<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<[^>]+>/g)) {
+    push('whitespace', xml.slice(last, m.index));
+    const t = m[0];
+    if (t.startsWith('<!--') || t.startsWith('<?')) {
+      push('punctuation', t);
+    } else {
+      const open = t.startsWith('</') ? '</' : '<';
+      const name = t.slice(open.length).match(/^[^\s/>]+/)?.[0] ?? '';
+      const close = t.endsWith('/>') ? '/>' : '>';
+      const attrs = t.slice(open.length + name.length, t.length - close.length);
+      push('punctuation', open);
+      push('tag', name);
+      let i = 0;
+      for (const a of attrs.matchAll(/(\s+)([^\s=]+)(\s*=\s*)("[^"]*"|'[^']*')/g)) {
+        push('whitespace', attrs.slice(i, a.index) + a[1]);
+        push('attr', a[2]);
+        push('punctuation', a[3]);
+        push('string', a[4]);
+        i = a.index! + a[0].length;
+      }
+      push('whitespace', attrs.slice(i));
+      push('punctuation', close);
+    }
+    last = m.index! + t.length;
+  }
+  push('whitespace', xml.slice(last));
+  return tokens;
+}
 
 function tokenize(json: string): Array<{ type: TokenType; text: string }> {
   const tokens: Array<{ type: TokenType; text: string }> = [];
@@ -76,7 +112,10 @@ interface JsonBlockProps {
 export function JsonBlock({ data, copyValue }: JsonBlockProps) {
   const [copied, setCopied] = useState(false);
   const json = (typeof data === 'string' ? data : JSON.stringify(data, null, 2)) ?? 'null';
-  const tokens = typeof data === 'string' ? [{ type: 'whitespace' as TokenType, text: data }] : tokenize(json);
+  const tokens =
+    typeof data !== 'string' ? tokenize(json)
+    : data.trimStart().startsWith('<') ? tokenizeXml(data)
+    : [{ type: 'whitespace' as TokenType, text: data }];
 
   const copy = () => {
     navigator.clipboard.writeText(copyValue ?? json);
