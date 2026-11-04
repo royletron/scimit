@@ -12,7 +12,14 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: process.env.SCIMIT_API ?? 'http://localhost:3000',
-        changeOrigin: true
+        changeOrigin: true,
+        xfwd: true,
+      },
+      // xfwd: the backend builds SAML URLs from X-Forwarded-Host, so they match what the browser sees
+      '/saml': {
+        target: process.env.SCIMIT_API ?? 'http://localhost:3000',
+        changeOrigin: true,
+        xfwd: true,
       },
       '/scim': {
         target: process.env.SCIMIT_API ?? 'http://localhost:3000',

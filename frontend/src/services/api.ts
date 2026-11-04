@@ -1,4 +1,4 @@
-import { User, Group, RequestLog, PlaybackTarget, PlaybackIdMapping, SyncResult } from '../types/scim';
+import { User, Group, RequestLog, PlaybackTarget, PlaybackIdMapping, SyncResult, SamlApp, SamlAppInput, SamlSignIn, SamlPost } from '../types/scim';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<{ data: T }> {
   const response = await fetch(`/api${path}`, {
@@ -35,6 +35,8 @@ export const adminApi = {
   getGroupLogs: (id: string) => request<RequestLog[]>(`/admin/groups/${id}/logs`),
   createUser: (body: any) => request('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
   updateUser: (id: string, body: any) => request(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  setUserGroups: (id: string, groupIds: string[]) =>
+    request<{ changed: string[] }>(`/admin/users/${id}/groups`, { method: 'PUT', body: JSON.stringify({ groupIds }) }),
   createGroup: (body: any) => request('/admin/groups', { method: 'POST', body: JSON.stringify(body) }),
   updateGroup: (id: string, body: any) => request(`/admin/groups/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteUser: (id: string) => request(`/admin/users/${id}`, { method: 'DELETE' }),
@@ -92,3 +94,31 @@ export const playbackApi = {
     body: JSON.stringify({ entityType, scimitId, targetId }),
   }),
 };
+
+export const samlApi = {
+  getIdp: () => request<{ certificate: string; fingerprint: string }>('/saml/idp'),
+  getApps: () => request<SamlApp[]>('/saml/apps'),
+  createApp: (data: SamlAppInput) => request<SamlApp>('/saml/apps', { method: 'POST', body: JSON.stringify(data) }),
+  updateApp: (id: string, data: SamlAppInput) => request<SamlApp>(`/saml/apps/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteApp: (id: string) => request(`/saml/apps/${id}`, { method: 'DELETE' }),
+  getSignIn: (id: string) => request<SamlSignIn>(`/saml/signins/${id}`),
+  completeSignIn: (id: string, userId: string) =>
+    request<SamlPost>(`/saml/signins/${id}/complete`, { method: 'POST', body: JSON.stringify({ userId }) }),
+};
+
+/** Hand the browser to the SP: auto-submits the SAML Response to its ACS URL (HTTP-POST binding) */
+export function postToAcs({ acsUrl, SAMLResponse, RelayState }: SamlPost) {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = acsUrl;
+  for (const [name, value] of Object.entries({ SAMLResponse, RelayState })) {
+    if (!value) continue;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}

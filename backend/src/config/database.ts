@@ -231,6 +231,29 @@ export function initializeDatabase() {
   if (!mappingCols.includes('last_synced')) db.exec('ALTER TABLE playback_id_mappings ADD COLUMN last_synced TEXT');
   if (!mappingCols.includes('version')) db.exec('ALTER TABLE playback_id_mappings ADD COLUMN version TEXT');
 
+  // SAML IdP (idempotent, not tied to app version)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS saml_apps (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      sp_entity_id TEXT NOT NULL,
+      acs_url TEXT NOT NULL,
+      name_id_format TEXT NOT NULL DEFAULT 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+      name_id_source TEXT NOT NULL DEFAULT 'email',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    -- (send_groups / groups_attribute are added below for databases created before they existed)
+    CREATE TABLE IF NOT EXISTS saml_idp (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      private_key TEXT NOT NULL,
+      certificate TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  const samlCols = (db.prepare('PRAGMA table_info(saml_apps)').all() as any[]).map((c) => c.name);
+  if (!samlCols.includes('send_groups')) db.exec('ALTER TABLE saml_apps ADD COLUMN send_groups INTEGER NOT NULL DEFAULT 0');
+  if (!samlCols.includes('groups_attribute')) db.exec("ALTER TABLE saml_apps ADD COLUMN groups_attribute TEXT NOT NULL DEFAULT 'groups'");
+
   // Ensure current app version is recorded
   db.prepare('INSERT OR IGNORE INTO schema_info (app_version) VALUES (?)').run(APP_VERSION);
 

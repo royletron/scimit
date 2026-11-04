@@ -12,6 +12,7 @@ import scimRoutes from './routes/scim.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import logsRoutes from './routes/logs.routes.js';
 import playbackRoutes from './routes/playback.routes.js';
+import { samlApi, samlPublic } from './routes/saml.routes.js';
 import { logRequest, logStartup } from './utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,10 @@ app.get('/health', (_req, res) => {
 app.use('/api/admin', adminRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/playback', playbackRoutes);
+app.use('/api/saml', samlApi);
+
+// SAML IdP endpoints for SPs (metadata, SSO). Public, like any IdP.
+app.use('/saml', samlPublic);
 
 // SCIM routes (require authentication) — only SCIM requests are logged
 // RFC 7644 §8.1: SCIM responses use application/scim+json (res.json keeps a preset type)

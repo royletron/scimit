@@ -73,3 +73,32 @@ export interface SyncResult {
   action: 'create' | 'update' | 'delete' | 'unchanged';
   warnings: string[];
 }
+
+export interface SamlApp {
+  id: string;
+  name: string;
+  sp_entity_id: string;
+  acs_url: string;
+  name_id_format: string;
+  name_id_source: 'email' | 'userName' | 'id';
+  send_groups: number;
+  groups_attribute: string;
+  created_at: string;
+  /** What to give the SP: SCIMit's IdP details for this app */
+  idp: { entityId: string; ssoUrl: string; metadataUrl: string };
+}
+
+export type SamlAppInput = Pick<SamlApp, 'name' | 'sp_entity_id' | 'acs_url' | 'name_id_format' | 'name_id_source' | 'groups_attribute'> & { send_groups: boolean };
+
+export interface SamlSignIn {
+  app: { id: string; name: string; spEntityId: string };
+  issuer: string | null;
+  spInitiated: boolean;
+  warnings: string[];
+}
+
+export interface SamlPost {
+  acsUrl: string;
+  SAMLResponse: string;
+  RelayState?: string;
+}

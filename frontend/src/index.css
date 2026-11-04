@@ -38,6 +38,8 @@
   --color-code-string: #e8dcae;
   --color-code-number: #c9b6f5;
   --color-code-punct: #8a8f99;
+  --color-code-tag: #8fd3cb;
+  --color-code-attr: #c9b6f5;
 }
 
 /* Dark theme: same roles, re-tuned values. data-theme is set before first paint (see index.html). */
@@ -71,6 +73,8 @@
   --color-code-string: #f1fa8c;
   --color-code-number: #bd93f9;
   --color-code-punct: #6272a4;
+  --color-code-tag: #ff79c6;
+  --color-code-attr: #50fa7b;
 }
 
 @layer base {
@@ -166,6 +170,8 @@
   /* Expanded rows bleed too: the tab strip and lists span the row, free-form tab content keeps the gutter */
   .data-table tr.detail > td { @apply bg-chalk px-4 pt-1 pb-5; }
   .data-table.bleed tr.detail > td { padding-inline: 0; padding-top: 0.875rem; }
+  /* Expanded content (long JSON/XML) scrolls inside the row instead of widening the table */
+  .data-table tr.detail > td > * { width: 0; min-width: 100%; }
 
   /* Surfaces */
   .panel { @apply bg-paper border border-line rounded-lg; }

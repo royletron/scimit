@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Activity, Gift, Inbox, LucideIcon, Moon, RotateCcw, Search, Send, Sun, User, Users } from 'lucide-react';
+import { Activity, Gift, Inbox, LogIn, LucideIcon, Moon, RotateCcw, Search, Send, Sun, User, Users } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
 import { subscribeLive } from '../../services/live';
@@ -133,6 +133,9 @@ export function Sidebar() {
         <Group label="Connections">
           <NavItem to="/connector" label="Receive from IdP" icon={Inbox} tone="lagoon" />
           <NavItem to="/playback" label="Send to SP" icon={Send} tone="disco" count={targets?.length} />
+        </Group>
+        <Group label="Sign-in">
+          <NavItem to="/sign-in" label="SAML apps" icon={LogIn} />
         </Group>
       </nav>
 

@@ -9,6 +9,8 @@ import { LogsPage } from './pages/LogsPage';
 import { ConnectorPage } from './pages/ConnectorPage';
 import { PlaybackPage } from './pages/PlaybackPage';
 import { ChangelogPage } from './pages/ChangelogPage';
+import { SamlAppsPage } from './pages/SamlAppsPage';
+import { SsoLoginPage } from './pages/SsoLoginPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,10 +21,9 @@ const queryClient = new QueryClient({
   },
 });
 
-function App() {
+// The dashboard: sidebar, pages, toasts and search
+function Shell() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
         <div className="min-h-screen md:flex">
           <Sidebar />
           <main className="flex-1 min-w-0 py-8 md:py-10">
@@ -34,11 +35,24 @@ function App() {
               <Route path="/connector" element={<ConnectorPage />} />
               <Route path="/playback" element={<PlaybackPage />} />
               <Route path="/changelog" element={<ChangelogPage />} />
+              <Route path="/sign-in" element={<SamlAppsPage />} />
             </Routes>
           </main>
           <Toaster />
           <CommandPalette />
         </div>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          {/* What an end user sees when an SP sends them to sign in: no dashboard chrome */}
+          <Route path="/sso/:id" element={<SsoLoginPage />} />
+          <Route path="*" element={<Shell />} />
+        </Routes>
       </BrowserRouter>
     </QueryClientProvider>
   );

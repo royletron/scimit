@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, CornerDownLeft, Gift, Inbox, LucideIcon, Moon, Plus, Search, Send, User, Users } from 'lucide-react';
+import { Activity, CornerDownLeft, Gift, Inbox, LogIn, LucideIcon, Moon, Plus, Search, Send, User, Users } from 'lucide-react';
 import { useUsers } from '../../hooks/useUsers';
 import { useGroups } from '../../hooks/useGroups';
 import { useTargets } from '../../hooks/usePlayback';
@@ -86,11 +86,13 @@ export function CommandPalette() {
       { id: 'a-user', section: 'Actions', label: 'New user', icon: Plus, run: go('/users?new=1') },
       { id: 'a-group', section: 'Actions', label: 'New group', icon: Plus, run: go('/groups?new=1') },
       { id: 'a-sp', section: 'Actions', label: 'Add SP', icon: Plus, run: go('/playback?new=1') },
+      { id: 'a-saml', section: 'Actions', label: 'Add SAML app', icon: Plus, run: go('/sign-in?new=1') },
       { id: 'a-theme', section: 'Actions', label: theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme', icon: Moon, run: toggle },
       { id: 'p-users', section: 'Go to', label: 'Users', icon: User, run: go('/users') },
       { id: 'p-groups', section: 'Go to', label: 'Groups', icon: Users, run: go('/groups') },
       { id: 'p-logs', section: 'Go to', label: 'Requests', icon: Activity, run: go('/logs') },
       { id: 'p-in', section: 'Go to', label: 'Receive from IdP', sub: 'connection details, bearer token', icon: Inbox, tone: 'text-lagoon', run: go('/connector') },
+      { id: 'p-saml', section: 'Go to', label: 'SAML apps', sub: 'single sign-on, IdP metadata', icon: LogIn, run: go('/sign-in') },
       { id: 'p-new', section: 'Go to', label: 'What’s new', sub: 'changelog, release notes', icon: Gift, run: go('/changelog') },
       { id: 'p-out', section: 'Go to', label: 'Send to SP', sub: 'targets, sync', icon: Send, tone: 'text-disco', run: go('/playback') },
       ...(users ?? []).map((u) => ({

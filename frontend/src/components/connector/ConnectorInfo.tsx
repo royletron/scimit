@@ -1,29 +1,12 @@
 import { useState } from 'react';
-import { Check, Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../services/api';
 import { JsonBlock } from '../common/JsonBlock';
 import { railClass } from '../common/ui';
+import { CopyField } from '../common/CopyField';
 import { toast, errorText } from '../common/toast';
 
-function CopyField({ label, value, display, children }: { label: string; value: string; display?: string; children?: React.ReactNode }) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <div>
-      <label className="field-label">{label}</label>
-      <div className="flex gap-2">
-        <input type="text" value={display ?? value} readOnly aria-label={label} className="input font-mono text-[13px]" />
-        {children}
-        <button onClick={copy} className="btn btn-secondary w-24">{copied ? <Check size={15} className="text-ok" aria-hidden /> : <Copy size={15} aria-hidden />} {copied ? 'Copied' : 'Copy'}</button>
-      </div>
-    </div>
-  );
-}
 
 const STEPS = [
   'Open the SCIM provisioning settings for your app in Okta, Entra ID or another IdP.',
