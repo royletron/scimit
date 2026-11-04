@@ -1,13 +1,14 @@
 # 🕺 SCIMit
 
-**Finally understand what your Identity Provider is actually doing — and test your own SCIM service like a real IdP would.**
+**Finally understand what your Identity Provider is actually doing — and test your own app like a real IdP would.**
 
-SCIMit is a local SCIM 2.0 workbench that works in both directions:
+SCIMit is a local SCIM 2.0 and SAML workbench:
 
 - **Receive from an IdP.** Point Okta, Entra ID or any SCIM-compatible IdP at SCIMit and watch users, groups and requests stream in live, with every header and body on hand.
 - **Send to an SP.** Create users and groups in SCIMit, then sync them to the SCIM service you're building. SCIMit provisions it the way Okta and Entra do, and checks every response against the spec.
+- **Sign in with SAML.** SCIMit is also a SAML 2.0 identity provider. Point your app at it and sign in as any SCIMit user, no passwords.
 
-> Perfect for debugging SCIM integrations, understanding IdP behaviour, testing your own SCIM endpoint, and not losing your mind during provisioning setup.
+> Perfect for debugging SCIM integrations, understanding IdP behaviour, testing your own SCIM endpoint and SAML login, and not losing your mind during provisioning setup.
 
 ---
 
@@ -25,6 +26,12 @@ SCIMit is a local SCIM 2.0 workbench that works in both directions:
 - **Sync all** — creates, updates (PATCH or PUT) and deletes everything on your SP, in the right order
 - **Behaves like a real IdP** — looks resources up by filter before creating them, tracks the SP's IDs, and sends `If-Match` for versioned updates
 - **Spec checks** — every SP response is checked against RFC 7643/7644, with warnings shown next to each result
+
+**Sign in with SAML**
+- **SAML 2.0 IdP** — add your app, give it SCIMit's metadata URL (or download `metadata.xml`), and sign in as any user
+- **SP- and IdP-initiated** — HTTP-Redirect and HTTP-POST bindings, `RelayState`, signed responses and assertions
+- **Groups in the assertion** — optional, with the attribute name your app expects, for JIT provisioning and role mapping
+- **Every exchange logged** — the AuthnRequest received and the Response sent, with XML highlighting
 
 **Around the dashboard**
 - **⌘K search** across users, groups, requests and SPs
@@ -116,6 +123,27 @@ You can also send a single user or group from its **Send to SP** tab, or replay 
 
 ---
 
+## 🔐 Sign in with SAML
+
+Use SCIMit as the SAML identity provider while you build your app's SSO. It's for testing only: there are no passwords, you just pick a user.
+
+1. **Add an app.** On **SAML apps**, choose **Add app** and enter your app's **ACS URL** (where SAML responses are posted) and **SP entity ID**. Choose the NameID format and value, and tick **Send group memberships** if your app maps groups to roles.
+2. **Configure your app.** Give it the app's **metadata URL** (`…/saml/apps/<id>/metadata.xml`), or download `metadata.xml` and upload it. If your app wants the values one by one, the SSO URL, IdP entity ID and signing certificate are all on the same card.
+3. **Sign in.** Start from your app (SP-initiated), or choose **Sign in as a user** in SCIMit (IdP-initiated). Either way you get a list of SCIMit users. Pick one and you're sent back to your app, signed in. Inactive users can't sign in.
+
+What's in the assertion:
+
+| | |
+|---|---|
+| NameID | Primary email, username or SCIMit user ID, as email address, unspecified or persistent format |
+| Attributes | `email`, `userName`, `firstName`, `lastName`, `displayName`, plus groups if enabled (one value per group, by display name) |
+| Signing | Response and assertion, RSA-SHA256 with exclusive canonicalisation, using a certificate SCIMit creates on first run |
+| Validity | 5 minutes, with `InResponseTo` set when your app sent an AuthnRequest |
+
+SCIMit warns on the sign-in page if your app's AuthnRequest names a different SP entity ID, or asks for a different ACS URL, than the app you set up.
+
+---
+
 ## 🛠️ Development (from source)
 
 ```bash
@@ -130,12 +158,16 @@ npm run build  # compiles everything to dist/
 | Dashboard (built) | http://localhost:3088 |
 | Backend (dev, internal) | http://localhost:3000 |
 
+pnpm works too: `pnpm install && pnpm dev`. CI uses npm, so add new packages with npm (or keep `package-lock.json` in step).
+
 Inside this repo, `npx scimit` won't work (npx resolves to the local project). Use `npm start` after a build.
 
 Quick checks, no test framework needed:
 
 ```bash
 npx tsx frontend/src/lib/diff.check.ts            # Changes view diffing
+npx tsx frontend/src/lib/xml.check.ts             # XML syntax highlighting
+npx tsx backend/src/services/saml.check.ts        # SAML responses, validated by a real SP library
 npx tsx frontend/src/lib/changelog.check.ts       # CHANGELOG.md is valid and matches package.json
 npx tsx backend/src/utils/native-error.check.ts   # SQLite driver error message
 ```
@@ -161,17 +193,17 @@ Bumping the version drafts a `CHANGELOG.md` entry from the `feat:` and `fix:` co
 
 ## 🏗️ Tech stack
 
-| Layer    | Tech |
+| Layer     | Tech |
 |----------|------|
-| Backend  | Node.js, Express, TypeScript, better-sqlite3 |
+| Backend  | Node.js, Express, TypeScript, better-sqlite3, xml-crypto (SAML signing) |
 | Frontend | React, Vite, TypeScript, Tailwind CSS v4, TanStack Query, Lucide icons, Recursive typeface |
-| Protocol | SCIM 2.0 (RFC 7643 / RFC 7644) |
+| Protocols | SCIM 2.0 (RFC 7643 / RFC 7644), SAML 2.0 |
 
 ---
 
 ## ⚠️ Heads up
 
-SCIMit is a **dev/debug tool** — it's not hardened for production. The admin API is unauthenticated by design, so keep it off the public internet.
+SCIMit is a **dev/debug tool** — it's not hardened for production. The admin API is unauthenticated by design, and anyone who can reach SCIMit can sign in to your SAML apps as any user. Keep it off the public internet, and never trust its signing certificate in production.
 
 ---
 
