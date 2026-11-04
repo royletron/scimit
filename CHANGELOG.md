@@ -2,6 +2,19 @@
 
 All notable changes to SCIMit. New entries are drafted from `feat:` and `fix:` commits when the version is bumped (see `scripts/changelog.mjs`).
 
+## [1.7.0] - 2026-11-04
+### Added
+- SAML 2.0 identity provider: add your app on **SAML apps**, then sign in to it as any SCIMit user. There are no passwords, you just pick who to be.
+- SP-initiated and IdP-initiated sign-in, with HTTP-Redirect and HTTP-POST bindings, `RelayState`, and signed responses and assertions.
+- Per-app metadata at `…/metadata.xml`, with a download button for apps that want a file upload.
+- Optional group memberships in the assertion, under the attribute name your app expects, for JIT provisioning and role mapping.
+- SAML requests and responses appear in Requests, and the sign-in page warns when an app's request doesn't match its setup.
+- Edit a user's groups from the Users page, and see them in a new Groups column.
+- Syntax highlighting for XML bodies, with Dracula colours in the dark theme.
+
+### Fixed
+- Long request bodies no longer stretch the Requests table and push its columns off-screen.
+
 ## [1.6.0] - 2026-11-04
 ### Added
 - What's new page listing every SCIMit release. A dot appears in the sidebar when there's one you haven't seen.

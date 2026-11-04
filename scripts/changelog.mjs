@@ -17,9 +17,14 @@ if (changelog.includes(`## [${version}]`)) {
   process.exit(0);
 }
 
-const git = (cmd) => execSync(`git ${cmd}`, { cwd: root, encoding: 'utf8' }).trim();
+const git = (cmd) => execSync(`git ${cmd}`, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+// Release tags are created by CI on GitHub, so fetch them first (fine to fail offline)
+try { git('fetch --tags --quiet'); } catch { /* offline */ }
+// Start from the previous release in CHANGELOG.md; fall back to the nearest tag
+const previous = changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1];
 let since = '';
-try { since = git('describe --tags --abbrev=0'); } catch { /* no tags yet: use all history */ }
+try { since = previous ? (git(`rev-parse --verify --quiet v${previous}`), `v${previous}`) : ''; } catch { /* tag not found */ }
+if (!since) try { since = git('describe --tags --abbrev=0'); } catch { /* no tags yet: use all history */ }
 const log = git(`log ${since ? `${since}..HEAD` : ''} --no-merges --format=%s%x1e`);
 
 // Conventional commits, optionally prefixed with an emoji: "✨ feat(ui): thing"
